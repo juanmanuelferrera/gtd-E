@@ -1,0 +1,208 @@
+#+TITLE: GTD Tasks
+#+STARTUP: overview
+
+* Inbox
+** TODO bbbb
+
+* Today
+** TODO limpiar la casa
+
+* Week
+** TODO añadir donación https://www.gofundme.com/manage/preserving-srila-prabhupadas-teachings-for-10000-years/donations
+** TODO cambiar las sabanas en hab pequeña
+
+* Monday
+** TODO poner el medallon en la cabecera de la pagina de FB
+** TODO Mira a ver si en el en la supuesta querella que me van a poner sale Javier Pera López
+** TODO buscar el papel del juzgado que me concede justicia gratuita
+** TODO cambiar el Srimad Bhagavatam para VV : https://www.prabhupadanugas.eu/news/books/dspobfco.html
+** TODO este es el link a los diffs: https://krishnaconsciousnessmovement.com/?p=33215 :vedicvault:
+** TODO rellenar esto en el vedabase
+** TODO voy por CCaritamrta revisar para VV
+** TODO comprar aceite de lino
+** TODO comer aceite de lino con paneer- media taza de paneer y 2 cucharadas de paneer
+** TODO hacer paneer
+** TODO tortillas de quinoa: https://www.facebook.com/reel/939861664934528
+** TODO hacer esta receta de salsa  https://www.facebook.com/reel/623122023844642
+** TODO https://www.facebook.com/watch/?v=1352433839461141 repostear sobre psicopatas
+** TODO hacer este remedio para tes
+** TODO ver https://optimizeyourself.me <https://optimizeyourself.me/> (Eze)
+** TODO hacer leche de almendra con exprime frutas verduras almendra cruda en remojo
+** TODO read 10 offenses 1705/59
+** TODO poner post de 28 dic mahajan violencia
+** TODO lavar el edredon
+** TODO añadir jugo de limón o pomelo al agua
+** TODO Fregar el dormitorio
+** TODO limpiar cocina
+** TODO limpiar wc
+** TODO ordenar casa
+** TODO implement mail in vedicvault and systeme.io
+** TODO hacer te de especias
+** TODO vender en wallapop mis cosas, lista: patinete, etc
+** TODO preguntar a systeme.io porque no resuelve http://vedicvault.org
+** TODO https://amzn.eu/d/bgFbvK6
+** TODO comprar
+** TODO https://www.facebook.com/reel/3349790538484271
+** TODO https://www.facebook.com/share/r/1BVnYZDJ48/
+** TODO Need Preface!
+** TODO Need Words from Apple
+** TODO Need to My Father, Gour Mohan De
+** TODO ssaa
+** TODO practicar todos dias para ponerse derecho https://www.facebook.com/reel/1896515427831929
+** TODO antes de dormir ejercicio  https://www.facebook.com/reel/1896515427831929
+** TODO postear para Hari chakra
+** TODO darle salida a mis revistas
+** TODO comprar toallitas humedas para higiene corporal
+** TODO probar esto, sabores raros: https://www.facebook.com/share/r/1HVWXSEyYV/
+** TODO hacer pan
+** TODO Elevation to Krishna Consciousness is OK for Vedic Vault
+** TODO buscar sitio para esconder el laxsmi o como llevarlo siempre encima.
+** TODO ver lo que me mandó Eze de prompts etc
+** TODO llos harán un escrito de reclamación al juzgado. el id de la llamada es 24 enero 2025 y el número 06109 comissio 977 495432  <2025-02-20 Thu>
+** TODO llamar al 93 214 2124 , buscar el papel que se me concede justicia gratuita y
+
+* Calendar
+** TODO avisar a Maria Eugenia si voy el martes 2025-03-17
+** TODO [[file:~/.emacs.d/my-org-files/downloads/2025/2025-02-18/screenshot_2025-02-18_16-02-52.png][screenshot_2025-02-18_16-02-52.png]]
+** TODO [[file:~/.emacs.d/my-org-files/downloads/2025/2025-02-18/screenshot_2025-02-18_16-46-21.png][screenshot_2025-02-18_16-46-21.png]]
+** TODO [[file:~/.emacs.d/my-org-files/downloads/2025/2025-02-18/screenshot_2025-02-18_16-52-55.png][screenshot_2025-02-18_16-52-55.png]
+** TODO el bono social de Curenergia es válido hasta <2027-02-24 Tue>
+** TODO solicitar la renovacion de mi Renta Valenciana entre  mayo a agosto de 2026 !!! (Due: 4/30/2026) <2026-04-23 jue>
+** TODO hacer posts FB hablando de como se avisó a los trustees Madhusevita etc del traspaso a la Fundación en un post y no han hecho nada <2025-09-02 Tue>
+** TODO Comprar uva moscatel (Due: 8/30/2025) <2025-08-30 sáb>
+** TODO renovar SEPE (Due: 12/6/2025) https://puntlabora.gva.es/puntlabora/ <2025-06-11 Wed>
+** TODO see Leanpub royalties every 3 months <2025-06-10 Tue>  https://leanpub.com/author_dashboard/royalties/summary
+** TODO cumpleaños de Radhika 4 june <2025-06-04 mié>
+** TODO Check if Alaukika got in touch wit Manidhara Prabhu regarding Vedic Vault <2025-05-15 Thu>
+** TODO Ir al oftalmólogo por las cataratas (Due: 3/1/2025) <2025-05-13 Tue>
+** TODO post de Pera diciendo que cada vez que viaja se hace un seguro en el futuro <2025-04-30 Wed>
+** TODO Decirle a Alaukika que si quiere ser representante de los medallones para Europa <2025-04-24 Thu>
+** TODO https://www.facebook.com/n.vrajamandala <2025-04-23 Wed>
+** TODO página de turismo de NVM para utilizar en su contra:
+** TODO programar un vuelo Alicante Tenerife con perplexity premium para Mayo por ejemplo <2025-04-18 Fri>
+** TODO mirar hoy si me han ingresado de leanpub royalties <2025-04-14 Mon> https://leanpub.com/author_dashboard/royalties/summary
+** TODO probar anti mosquitos (agua y levadura) https://www.facebook.com/share/r/1BChe71PTk/  <2025-04-13 Sun>
+** TODO Semana Santa : 13 al 20 de abril <2025-04-12 Sat>
+** TODO Sr.J.FERRERA, cita para CONSULTA PRESENCIAL en H. GRAL.UNIV. DR. BALMIS el 11/04/2025 a las 10:15 en HOSP.PLANTA BAJA UROLOGIA. llevar la radiografia y analisis. Si necesita cambiar la cita llame 965933020 <2025-04-11 Fri>
+** TODO 11 abrl para litriasis 10:15 am H. General Alicante planta baja torre B - no ayunas solo consulta --- llevar la radiografia y analisis <2025-04-11 Fri>
+** TODO 10 abrl 11:24 Hospital San Juan planta segunda consulta 7 urología --- llevar la radiografia y analisis <2025-04-10 Thu>
+** TODO hacer la declaración de la Renta (Due: 3/12/2025) <2025-04-10 jue>
+** TODO hacer radiografía para ir con ella a las consultas <2025-04-07 Mon>
+** TODO hacer análisis de sangre y orina para ir a las consultas <2025-04-03 Thu>
+** TODO Limpiar el escurridor de platos, cada mes y medio  <2025-04-02 Wed>
+** TODO ver lista Algun Dia <2025-04-01 Tue>
+** TODO hacerme la radiografía en el hospital entre el 7 y el 10 lo mas cerca posible de la cita <2025-03-30 Sun>
+** TODO hacerme analisis sangre y orina en centro de salud- antes de las consultas <2025-03-30 Sun>
+** TODO dejar de pagar calendkly <2025-03-30 Sun>
+** TODO lista de posibles donantes para GVV <2025-03-28 Fri>
+** TODO https://www.youtube.com/watch?v=rsrCf-wIuiI <2025-03-27 Thu>
+** TODO a ver si continua mi comentario ahi
+** TODO borrarme de la mensualidad Capcut antes del 25 de Marzo <2025-03-24 Mon>
+** TODO ir a visitar la isla de Tabarca en Marzo (23€ i/v) <2025-03-23 Sun>
+** TODO ver video como bañarse personas mayores agua ducha lavar https://www.youtube.com/watch?v=MYl7hFYa6lY <2025-03-22 Sat>
+** TODO hablar con Hamsaraj <2025-03-20 Thu>
+** TODO enviar video a Eze como bañarse personas mayores agua https://www.youtube.com/watch?v=MYl7hFYa6lY <2025-03-20 Thu>
+** TODO usar las mancuernas <2025-03-19 Wed>
+** TODO post para desmontar a Gargamuni que es un hippy tengo la conversación en FB <2025-03-19 Wed>
+** TODO revisar este nuevo IA https://grok.com <2025-03-19 Wed>
+** TODO Compara values 1705/11/1 -> 3013  <2025-03-18 Tue>
+** TODO hacer esto para liberar un nervio  https://www.facebook.com/reel/1778663012677019 <2025-03-17 Mon>
+** TODO comprobar si vedicvault.org resuelve sin www <2025-03-14 Fri>
+** TODO subir post 10 nov 24 https://www.facebook.com/photo.php?fbid=9164076673624850&set=pb.100000678264161.-2207520000&type=3 <2025-03-14 Fri>
+** TODO https://www.facebook.com/photo?fbid=9747805445251967&set=a.7722918217740710  <2025-03-14 Fri>
+** TODO subir arriba de FB el post de los demonios adorando a Tamal con esta foto  [[file:~/.emacs.d/my-org-files/downloads/2025/2025-02-21/screenshot_2025-02-21_09-41-16.png][ screenshot_2025-02-21_09-41-16.png]]
+** TODO Borrarme de Amazon Prime hoy <2025-03-13 Thu>
+** TODO Gaura Purnima <2025-03-13 Thu>
+** TODO escribir a Bruce que pasa con colgantes <2025-03-13 Thu>
+** TODO https://github.com/ruebeckscube/org-remarkable-reading-list <2025-03-13 Thu>
+** TODO instalar esto para sync Remarkable con org-mode:
+** TODO postear arriba el post de Pera del 19 Diciembre <2025-03-11 Tue>
+
+* Someday
+** TODO como se llama cuando el cielo de la boca es mas estrecho?
+** TODO ver y enviar los royalties de los libros de Draupadi y Brajisma
+** TODO ver si tengo Gita original en ingles para llevar a Roy la proxima vez que vaya a Tenerife
+** TODO ver las hojas en papel para no roncar etc
+** TODO ver https://optimizeyourself.me <https://optimizeyourself.me/> (Eze)
+** TODO ver el credito que tengo en ChatGPT: https://platform.openai.com/settings/organization/billing/overview
+** TODO tomar prasadam en sikh temple de Barcelona y sikh temple de Madrid https://nanaksarmadrid.com/
+** TODO seguir con el app de todo list on VO Al -> https://vO.dev/chat/OzTY3ggFeiX <https://vo.dev/chat/OzTY3ggFeiX>
+** TODO rehacer pariprashnena con Al
+** TODO read 10 offenses 1705/59
+** TODO publicar los libros en griego de alguna manera para ganar $
+** TODO mi programa kirtan itinerante
+** TODO por eso dice KRICHNA.. no puede ni cantar japa adecuadamente.
+** TODO como lo contó un médico que le atendió
+** TODO Sí, un paladar estrecho puede contribuir a un "clic" o sonido característico al hablar, especialmente si hay tensión en los músculos de la mandíbula o si los dientes no encajan correctamente
+** TODO 6. *Dolores de cabeza*: Tensión en la mandíbula puede provocar cefaleas.
+** TODO 5. *Infecciones de oído*: Puede estar relacionado con infecciones recurrentes en algunos casos.
+** TODO 4. *Problemas dentales*: Mayor riesgo de apiñamiento dental y problemas de alineación.
+** TODO 3. *Respiración*: Puede contribuir a problemas respiratorios, como la respiración bucal.
+** TODO 2. *Problemas de habla*: Puede causar dificultades en la pronunciación de ciertos sonidos.
+** TODO 1. *Dificultades en la masticación*: Puede afectar la forma en que los dientes encajan y se muerden los alimentos.
+** TODO Los síntomas y problemas asociados con un paladar estrecho pueden incluir:
+** TODO y cuales son los sintomas y problemas
+** TODO Esa condición se llama "paladar estrecho" o "paladar ogival". Puede estar asociado con problemas ortodónticos o de desarrollo craneofacial.
+** TODO post describiendo los problemas de garganta de Pera,
+** TODO Suele suceder que dictan la prision preventiva cuando consideran que hay riesgo de fuga.
+** TODO Y de ahi lo localizaron y deportaron a Alemania y está a la espera de juicio.
+** TODO Fue la policia de nuevo al templo un dia por la mañana y le dijeron que ya no vivía ahi y que no sabian nada (lavándose las manos al estilo egoísta característico).
+** TODO Le reclamaban por el juicio en Alemania y finalmente lo tenian vigilado aqui.
+** TODO Volvió al restaurante unos dias después y le preguntaron que habia pasado, pero no dijo nada.
+** TODO A los pocos dias la policia secreta le fue a buscar al restaurante de la calle Diputación y se lo llevaron.
+** TODO Cuando la madre del niño abusado me contactó, investigué y vi que había indicios, hablé con un conocido mio que es policía y me dijo donde teníamos que acudir.
+** TODO Y viviendo en el templo regentado pr Mario Condón y trabajando en el restaurante de calle Diputación, también de Mario Condón.
+** TODO Estaba buscado acusado de 8 delitos de pedofilia.
+** TODO En los comentarios tienen el documento oficial de un juzgado de Alemania.
+** TODO Aunque los detalles están en el post anterior y los comentarios. Hay bastantes pormenores que vamos a relatar aquí.
+** TODO poner este post del pedofilo? quizá no porque me delata como actor material de la investigaacion y puedo tener consecuencias
+** TODO patinete 800€ 50km autonomía https://youtube.com/shorts/Dde71a4Ynqk?si=gjj0xBmQ8kTW5twq
+** TODO narcisistas: https://www.facebook.com/vaisnavasdeespana/videos/1352433839461141/?comment_id=8404908779608992&notif_id=1738460386680147&notif_t=feed_comment
+** TODO mu4e https://www.youtube.com/live/yZRyEhi.
+** TODO limpiar macbook con aire
+** TODO limpiar lóbulos orejas
+** TODO limpiar el escurridor de platos, cada mes
+** TODO libro de Krsna: https://www.youtube.com/watch?v=exuDg8cZNec&list=PL59F033D35340CCD8&index=24 página 198 y bhajan por la noche
+** TODO lavar el edredon para guardarlo para el verano
+** TODO la URL de mi app GTD https://replit.com/@jaganat/TaskHarmony
+** TODO jaganat@gmail.com <mailto:jaganat@gmail.com> -> recargar saldo ChatGPT  https://platform.openai.com/settings/organization/billing/history.
+** TODO ir al oftalmólogo por las cataratas
+** TODO Investiga la posibilidad de hacer hacer esto de SaraHa venderlo en Amazon venderlo en plataformas digitales
+** TODO intentar hacer propaganda del VV en la India para colectar entre la gente
+** TODO install m4e https://www.youtube.com/watch?v=Qq6s3PwSwjo
+** TODO https://vO.dev/chat/OzTY3ggFeiX?b=b_Ze5c8VpZoLL <https://vo.dev/chat/OzTY3ggFeiX?b=b_Ze5c8VpZoLL>
+** TODO https://gtdeasy.vO.build/ <https://gtdeasy.vo.build/> https://b_ze5c8vpzoll.vO.build/ <https://b_ze5c8vpzoll.vo.build/>
+** TODO hacer un video sobre los origenes de Hare Krishna en España
+** TODO hacer libro pariprashnena y otro Cel con leanpub
+** TODO Hacer el mismo medallón con Saraha del Gita, pero con el mío en español
+** TODO hacer brazalete con 5-6 posibilidades on/off
+** TODO hablar con El Corte Inglés o con joyerías de España grandes, para hacerme representante de Mister Bruce Ha para que puedan vender sus productos aquí en España
+** TODO escuchar buzon voz simyo
+** TODO escribir mi libro con mi vida
+** TODO conseguir una tambura para cantar hare krishna en casa
+** TODO comprar oro?
+** TODO autogpt discord https://discord.com/channels/1092243196446249134/@home
+** TODO leer de eze: https://harper.blog/2025/02/16/my-llm-codegen-workflow-atm/
+** TODO tomar leche caliente con ashwagandha para reducir cortisol y da mente clara.
+
+* Archive
+** TODO download and post: https://www.facebook.com/reel/1106973801443803 (from Inbox)
+** TODO llega reloj Mondaine el 13 a locker DIA (from Week)
+** TODO Pasar las cosas del calendario de Emacs al calendario de pared grande
+** TODO Post para FB: Hare Krishna saludos: Que curioso, que el mismo caso de Gauravani G. es exactamente el mismo que Kesava S. (argentino), quién se enriqueció con dinero robado de los templos que él admiistró. Pero su "golpe maestro" fue cuando buscó la administración del templo de Miami, en el cual falsificó las firmas de todo el board (comité) brahmínico, que incluía al destacado Hariscandra prabhú, un abogado de buen nivel en el gobierno y discípulo de Srila Prabhupada. - De esa manera hipotecó la propiedad en dos bancos diferentes, por USD. 800,000 y con lo cual compró una finca en el sur de Florida (Homstead) dicha finca la puso a nombre de su madre, por lo cual, los devotos no pudieron recuperarla. Posteriormente, la vandió en un millón de dólares, los cuales entregó a su hermano Ravanari S. y al hermano menor, con esto ellos compraron tierras en Mayapur y construlleron complejos de apartamentos, para rentas. Y desde ese momento, Kesava, recibe cada mes en su cuenta personal, ganancias que le han facilitado su vida de sannyasi falso. También en Guatemala, hay una madre llamada Gopi d.d. quien afirma haberle entregado USD. 50,000 los cuales eran para la construcción del primer templo védico en Guatemala, pero que nunca se volvieron a ver. Y así hay varias historias, que se han tejido a su alrededor, como esa que en U.S.A. tiene arraigo por que se considera un cargo criminal, por lo que hizo con el templo. Cuando Kesava, se enteró de eso, se fué a esconder a Filipinas en un templo budista, en el cual radicó durante diez años. Una vez pasado es tiempo, regresó a sudamérica, donde viaja constantemente, engañando a los jóvenes quienes lo consideran un gran devoto. Vive en total impunidad y sin cargos de conciencia, porque cada año va a la India a purificar sus pecados y z dormir en la cueva de Haridas Thakura, baños en el Ganges y otros rios sagrados.- Hay que alertar a la gente inocente, porque seguramente está planeando otra de las suyas. Hare Krishna.
+** TODO 33333333 (from Today)
+** TODO wwww (from Today)
+** TODO vvvvv (from Inbox)
+** TODO dfsdfsd (from Week)
+** TODO ffsdfsdfsdf (from Week)
+** TODO dfsdfsfsdfsdfdsfs (from Week)
+** TODO dfsdfsdfsdfsdfsdfsdfd (from Week)
+** TODO sfdsfsdfdsfsdfsdf (from Week)
+** TODO fsdfsdfsdfsdfsdfsdfsdfsd (from Week)
+** TODO fsfsdfsfdsf (from Week)
+** TODO chichi (from Week)
+** TODO 212121212121 (from Week)
+** TODO 1111 (from Week)
+** TODO fsfdfsdf (from Week)
+** TODO 222222 (from Week)
+
