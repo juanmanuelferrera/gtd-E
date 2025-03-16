@@ -102,3 +102,6 @@ The calendar functionality streamlines task management, ensuring visibility of d
 
 This software is based on GTD+R paper system by Kenji Ohta:
 https://gtd-r.blogspot.com/
+
+https://github.com/user-attachments/assets/6ab7d15c-89c4-46ce-a318-6e5169e6b687
+
