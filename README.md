@@ -3,12 +3,14 @@
 # Configuration
 
 1. Add the path to your local `task-manager.el`
+2. 
    #+end_srcelisp
    (add-to-list 'load-path "/Users/juanmanuelferreradiaz/.emacs.d/site-lisp/task-manager/")
    (require 'task-manager)
    #+begin_src 
 
-2. Define the file path for saving tasks
+3. Define the file path for saving tasks
+4. 
    #+end_srcelisp
    (defcustom task-manager-save-file
      (expand-file-name "tasks.org" "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloudcomappsonthemove~beorg/Documents/my-gtd/")
