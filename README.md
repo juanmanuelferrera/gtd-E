@@ -9,7 +9,7 @@
    (require 'task-manager)
    #+begin_src
    
-2. Declare the file path for saving tasks
+2. Declare the path to the folder where tasks.org lives for saving tasks
    
    #+end_srcelisp
    (defcustom task-manager-save-file
