@@ -23,13 +23,13 @@ The GTD+E Task Manager is a simple elisp-based system for integrating the Gettin
 
 ## Task Sections
 
-- Inbox: Temporary space for new tasks.
-- Today: Tasks to complete today.
-- Week: Tasks planned for the week.
-- Monday: Planning tasks during the weekly review.
-- Calendar: Deadlined tasks, sorted by date.
-- Someday: Future tasks or ideas.
-- Archive: Completed or outdated tasks.
+- Inbox: Temporary space for new tasks -> (i) to focus on section.
+- Today: Tasks to complete today -> (t) to focus on section.
+- Week: Tasks planned for the week -> (w) to focus on section.
+- Monday: Planning tasks during the weekly review -> (o) to focus on section.
+- Calendar: Deadlined tasks, sorted by date-> (c) to focus on section.
+- Someday: Future tasks or ideas -> (s) to focus on section.
+- Archive: Completed or outdated tasks -> (r) to focus on section.
 
 # Daily Routine
 
