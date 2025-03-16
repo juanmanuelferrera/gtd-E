@@ -1,102 +1,99 @@
 # Gtd-E
 
-* Configuration for task-manager.el
+# Configuration
 
-;; Add the path to your local task-manager.el
+1. Add the path to your local `task-manager.el`
+   #+end_srcelisp
+   (add-to-list 'load-path "/Users/juanmanuelferreradiaz/.emacs.d/site-lisp/task-manager/")
+   (require 'task-manager)
+   #+begin_src 
 
-(add-to-list 'load-path "/Users/juanmanuelferreradiaz/.emacs.d/site-lisp/task-manager/")
-(require 'task-manager)
+2. Define the file path for saving tasks
+   #+end_srcelisp
+   (defcustom task-manager-save-file
+     (expand-file-name "tasks.org" "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloudcomappsonthemove~beorg/Documents/my-gtd/")
+     "File where task manager data is saved."
+     :type 'file
+     :group 'task-manager)
+   #+begin_src 
 
-;; Define the file path for saving tasks
+# GTD+E Task Manager Overview
 
-(defcustom task-manager-save-file 
-  (expand-file-name "tasks.org" "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/")
-  "File where task manager data is saved."
-  :type 'file
-  :group 'task-manager)
-#+end_src
+The GTD+E Task Manager is a simple elisp-based system for integrating the Getting Things Done (GTD) methodology with enhanced task organization. It provides sections for different tasks, allowing efficient tracking and prioritizing.
 
-1. Modify the =load-path= to point to your local installation of =task-manager.el=.
-2. Update the =task-manager-save-file= path to where your =tasks.org= file is located.
+## Task Sections
 
+- Inbox: Temporary space for new tasks.
+- Today: Tasks to complete today.
+- Week: Tasks planned for the week.
+- Monday: Planning tasks during the weekly review.
+- Calendar: Deadlined tasks, sorted by date.
+- Someday: Future tasks or ideas.
+- Archive: Completed or outdated tasks.
 
-* GTD+E Task Manager Manual
+# Daily Routine
 
-** Overview
-The GTD+E Task Manager is a simple and effective task management system designed in elisp for integrating the Getting Things Done (GTD) methodology with enhanced task organization using Emacs (GTD+E). It provides sections for different types of tasks, allowing for efficient tracking, reviewing, and prioritizing of tasks.
-
-*** Sections
-1. *Inbox*: Temporary space for capturing new tasks with no designated placement.
-2. *Today*: Tasks you aim to complete today.
-3. *Week*: Tasks you plan to address within this week.
-4. *Monday*: Assists in planning tasks for the upcoming week during the weekly review.
-5. *Calendar*: Tasks with specific deadlines, sorted by date.
-6. *Someday*: Ideas or tasks to consider for future scheduling.
-7. *Archive*: Storage for completed or out-of-date tasks, allowing for later reference.
-
-** Daily Routine
 At the start of each day:
-1. Open the *Today* section and identify which tasks you plan to focus on.
-2. Review the *Week* section to ensure you are aligned with your weekly goals.
-3. Adjust as necessary, moving tasks from the Week section to Today.
+1. Open the Today section and select tasks to focus on.
+2. Review the Week section to align with weekly goals.
+3. Adjust tasks between sections as necessary.
 
-** Weekly Review (Every Monday)
-Conduct a review to determine:
-1. Progress on tasks listed in the *Week* and *Today* sections.
-2. Evaluate tasks in the *Monday* section to decide what needs to be moved into *Week* or *Today*.
-3. For any tasks that are ready to be moved to *Today* or remain in *Someday*, make those adjustments.
+# Weekly Review
 
-** Monthly Review (1st of each Month)
+Conduct a review every Monday:
+- Assess progress on tasks in Week and Today sections.
+- Evaluate Monday section tasks for movement to Week or Today.
+- Adjust accordingly.
+
+# Monthly Review
+
 On the first of each month:
-1. Inspect tasks in the *Someday* section.
-2. Determine which tasks are still relevant and sort them into Today, Week, or Monday sections, or leave them in Someday.
-3. Archive tasks that can be closed for good.
+- Inspect Someday section tasks.
+- Sort relevant tasks into Today, Week, or Monday sections, or leave in Someday.
+- Archive tasks that can be closed.
 
-** Task Operations
-- *Add Tasks*: Utilize the keybinding =a= to add tasks to the Inbox, or select a section to add tasks directly.
-- *Edit Tasks*: Click on any task in the display to edit it inline, which allows for immediate changes.
-- *Delete Tasks*: Use the =d= key to delete any selected tasks, with the option to permanently delete using =C-k=.
-- *Move Tasks*: Use =m= to move selected tasks to another section for better organization.
-- *Focus*: Use section-specific commands to collapse all other sections and focus on one section at a time.
+# Task Operations
 
-** Calendar Functionality in GTD+E Task Manager*
+- Add Tasks: Use keybinding `a` to add to Inbox or directly to sections.
+- Edit Tasks: Click on a task to edit inline.
+- Delete Tasks: Use `k` to delete selected tasks.
+- Move Tasks: Use `m` to move to another section.
+- Focus: Collapse other sections to focus on one.
 
-The calendar functionality in the GTD+E Task Manager enhances time-sensitive task management by allowing users to link tasks with specific deadlines easily. 
+# Calendar Functionality
 
-** Key Features:
+The calendar feature enhances time-sensitive task management.
 
-1. *Task Date Insertion*: 
-   - Use the =C-c d= command during task entry to bring up a calendar interface, enabling quick date selection for tasks.
+## Key Features
 
-2. *Automatic Calendar Section*: 
-   - Tasks with assigned dates automatically appear in a newly created section called "Calendar Tasks" at the top of the main sections, ensuring immediate visibility.
+- Task Date Insertion: Use `C-c d` to bring up a calendar for quick date selection.
+- Automatic Calendar Section: Tasks with dates appear in "Calendar Tasks" at the top.
+- Sorting by Date: Calendar section tasks are sorted by due dates.
+- Daily Review: Check Calendar section for tasks due today.
 
-3. *Sorting by Date*: 
-   - Tasks in the Calendar section are sorted by due dates, allowing you to prioritize deadlines effectively.
+## Using Calendar Functionality
 
-4. *Daily Review*: 
-   - Quickly check the Calendar section to identify tasks due today, streamlining daily planning.
+- Navigate with arrow keys, select a date with `RET`, or cancel with `q`.
+- Regularly check the Calendar section for updates.
 
-** Using Calendar Functionality:
+# Conclusion
 
-- Navigate the calendar using arrow keys, select a date with =RET=, or cancel with =q=.
-- Regularly check the Calendar section to stay updated on impending deadlines and integrate tasks into your daily workflow.
+The calendar functionality streamlines task management, ensuring visibility of due tasks for effective prioritization and deadline tracking.
 
-** Conclusion
+# Task Management Key Bindings
 
-The calendar functionality in the GTD+E Task Manager streamlines task management by automatically highlighting date-driven tasks in the "Calendar Tasks" section at the very top of the screen, enabling efficient prioritization and effective deadline tracking.
+- `a`: Add a single task.
+- `A`: Add multiple tasks.
+- `k`: Delete selected tasks.
+- `m`: Move selected tasks.
+- `W`: Move all tasks from Inbox and Today to Week.
+- `D`: Delete all tasks with confirmation.
+- `z`: Expand/collapse all sections.
+- `e`: Toggle section expansion.
+- `n` / `p`: Move to next/previous task.
+- `RET`: Edit the task under the cursor.
 
-* Task Management Key Bindings
-- =a=: Add a single task.
-- =A=: Add multiple tasks (one per line).
-- =k=: Delete selected tasks.
-- =m=: Move selected tasks.
-- =W=: Move all tasks from Inbox and Today to Week.
-- =D=: Delete all tasks with confirmation.
-- =z=: Expand/collapse all sections.
-- =e=: Toggle expansion of one section.
-- =n= / =p=: Move to the next/previous task.
-- =RET=: Edit the task under the cursor.
+# Final Remark
 
-* Conclusion
-Using the GTD+E Task Manager allows you to maintain a structured approach to managing tasks, facilitating daily operational success, weekly reviews for strategic alignment, and monthly reflection to ensure long-term productivity. Follow this manual for efficient use and empowerment through organizational clarity.
+This software is based on GTD+R paper system by Kenji Ohta:
+https://gtd-r.blogspot.com/
