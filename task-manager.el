@@ -231,6 +231,51 @@
             (push (cons section task) todays-tasks)))))
     (nreverse todays-tasks)))
 
+(defun task-manager-parse-date-from-task (task)
+  "Extract date from TASK string in format YYYY-MM-DD or <YYYY-MM-DD Day>."
+  (let ((date nil))
+    ;; Try to match <YYYY-MM-DD Day> format
+    (if (string-match "<\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\) [A-Za-z]\\{3\\}>" task)
+        (setq date (match-string 1 task))
+      ;; Try to match YYYY-MM-DD format
+      (when (string-match "\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)" task)
+        (setq date (match-string 1 task))))
+    date))
+
+(defun task-manager-date-to-days (date-str)
+  "Convert DATE-STR in format YYYY-MM-DD to days since epoch."
+  (when date-str
+    (let ((year (string-to-number (substring date-str 0 4)))
+          (month (string-to-number (substring date-str 5 7)))
+          (day (string-to-number (substring date-str 8 10))))
+      (calendar-absolute-from-gregorian (list month day year)))))
+
+(defun task-manager-sort-tasks-by-date (tasks)
+  "Sort TASKS by date, with dates closer to today appearing first."
+  (let* ((today (calendar-absolute-from-gregorian 
+                (calendar-current-date)))
+         (tasks-with-dates
+          (mapcar (lambda (task)
+                    (let* ((date-str (task-manager-parse-date-from-task task))
+                           (days (task-manager-date-to-days date-str))
+                           (distance (if days (abs (- days today)) 999999)))
+                      (list task date-str distance)))
+                  tasks)))
+    ;; Sort by distance from today
+    (setq tasks-with-dates 
+          (sort tasks-with-dates 
+                (lambda (a b) 
+                  (< (nth 2 a) (nth 2 b)))))
+    ;; Extract just the tasks
+    (mapcar #'car tasks-with-dates)))
+
+(defun task-manager-safe-recenter ()
+  "Recenter the window displaying the task manager buffer."
+  (let ((windows (get-buffer-window-list (current-buffer) nil t)))
+    (when windows
+      (with-selected-window (car windows)
+        (recenter)))))
+
 (defun task-manager-refresh ()
   "Refresh the task manager display."
   (task-manager-clean-empty-tasks)
@@ -245,6 +290,12 @@
       (insert (format " [Moving from: %s]" task-manager-move-source)))
     (insert "\n============\n\n")
     
+    ;; Sort Calendar tasks by date
+    (let ((calendar-tasks (gethash "Calendar" task-manager-tasks)))
+      (when calendar-tasks
+        (setf (gethash "Calendar" task-manager-tasks)
+              (task-manager-sort-tasks-by-date calendar-tasks))))
+    
     ;; Display today's tasks at the top if any exist
     (let ((todays-tasks (task-manager-get-todays-tasks)))
       (when todays-tasks
@@ -254,7 +305,14 @@
                  (task (cdr task-pair))
                  (selected (member task task-manager-selected-tasks)))
             (insert (format "  [%s] " (if selected "*" " ")))
-            (task-manager-insert-task-with-links task)
+            ;; Make task text clickable for editing
+            (insert-text-button task
+                              'face (if selected 'bold 'default)
+                              'follow-link t
+                              'task task
+                              'section section
+                              'action #'task-manager-edit-task-inline
+                              'help-echo "Click to edit task")
             (insert (format " (in %s)\n" section))))
         (insert "\n============\n\n")))
     
@@ -273,7 +331,7 @@
     (insert "  m: Move selected task(s) to another section\n")
     (insert "  M: Move all tasks from one section to another\n")
     (insert "  W: Move all tasks from Inbox and Today to Week\n")
-    (insert "  k: Move selected task(s) to Archive\n")
+    (insert "  k: Delete selected task(s)\n")
     (insert "  K: Move all tasks in section to Archive\n")
     (insert "  x: Move selected task(s) to Archive\n")
     (insert "  D: Delete ALL tasks from ALL sections (with confirmation)\n")
@@ -284,7 +342,9 @@
     ;; Restore cursor position
     (goto-char (point-min))
     (forward-line (1- current-line))
-    (move-to-column current-column)))
+    (move-to-column current-column)
+    ;; Center the view on the cursor using the safe function
+    (task-manager-safe-recenter)))
 
 (defun task-manager-insert-section (section)
   "Insert SECTION and its tasks."
@@ -373,13 +433,14 @@
                                        (with-selected-window window
                                          (erase-buffer)
                                          (insert prompt "\n\n")
-                                         (insert initial-text)
-                                         (insert "\n\n[RET: save, C-g: cancel]")
-                                         ;; Move cursor to input position
-                                         (goto-char (point-min))
-                                         (forward-line 2)
-                                         (when initial-text
-                                           (goto-char (+ (point) (length initial-text)))))))))))
+                                         ;; Insert the text and remember cursor position
+                                         (let ((input-pos (point)))
+                                           (insert initial-text)
+                                           (insert "\n\n[RET: save, C-g: cancel]")
+                                           ;; Move cursor to end of input text
+                                           (goto-char input-pos)
+                                           (when initial-text
+                                             (forward-char (length initial-text)))))))))))
     window))
 
 (defun task-manager-insert-date-from-calendar ()
@@ -518,24 +579,32 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
    section))
 
 (defun task-manager-delete-tasks ()
-  "Move selected tasks to Archive section."
+  "Delete Calendar tasks and move other tasks to Archive section."
   (interactive)
   (when task-manager-selected-tasks
-    (dolist (task task-manager-selected-tasks)
-      (dolist (section task-manager-sections)
-        (let ((tasks (gethash section task-manager-tasks)))
-          (when (member task tasks)
-            (setf (gethash section task-manager-tasks)
-                  (remove task tasks))
-            ;; Add to Archive with source section info
-            (let ((archived-task (if (string= section "Archive")
-                                   task
-                                 (concat task " (from " section ")"))))
-              (push archived-task (gethash "Archive" task-manager-tasks)))))))
-    (setq task-manager-selected-tasks nil)
-    (task-manager-save-data)
-    (task-manager-refresh)
-    (message "Tasks moved to Archive")))
+    (let ((deleted-count 0)
+          (archived-count 0))
+      (dolist (task task-manager-selected-tasks)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              ;; Calendar tasks and tasks with today's date are deleted, others are archived
+              (if (or (string= section "Calendar")
+                      (string-match-p (format-time-string task-manager-date-format) task))
+                  (setq deleted-count (1+ deleted-count))
+                (let ((archived-task (if (string= section "Archive")
+                                       task
+                                     (concat task " (from " section ")"))))
+                  (push archived-task (gethash "Archive" task-manager-tasks))
+                  (setq archived-count (1+ archived-count))))))))
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-data)
+      (task-manager-refresh)
+      (message "%d task%s deleted, %d task%s archived"
+               deleted-count (if (= deleted-count 1) "" "s")
+               archived-count (if (= archived-count 1) "" "s")))))
 
 (defun task-manager-permanently-delete-tasks ()
   "Permanently delete selected tasks from Recycle Bin."
@@ -613,7 +682,7 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
       (task-manager-refresh))))
 
 (defun task-manager-next-task ()
-  "Move point to the next task line."
+  "Move point to the next task line and center the view."
   (interactive)
   (let ((orig-pos (point))
         (found nil))
@@ -628,12 +697,13 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
     (if found
         (progn
           (move-to-column 2)
+          (task-manager-safe-recenter)
           (message "Moved to next task"))
       (goto-char orig-pos)
       (message "No next task found"))))
 
 (defun task-manager-previous-task ()
-  "Move point to the previous task line."
+  "Move point to the previous task line and center the view."
   (interactive)
   (let ((orig-pos (point))
         (found nil))
@@ -648,6 +718,7 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
     (if found
         (progn
           (move-to-column 2)
+          (task-manager-safe-recenter)
           (message "Moved to previous task"))
       (goto-char orig-pos)
       (message "No previous task found"))))
@@ -655,24 +726,55 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
 (defun task-manager-toggle-task ()
   "Toggle selection of task at point and move to next task."
   (interactive)
-  (let ((was-on-task (save-excursion
-                       (beginning-of-line)
-                       ;; Match both regular tasks and Today's Tasks format
-                       (or (looking-at "  \\[[ *]\\] \\(.+?\\)\\( \\[RET to edit\\]\\)?$")
-                           (looking-at "  \\[[ *]\\] \\(.+?\\) (in .+)$"))))
-        (current-point (point)))
-    (when was-on-task
+  (let ((was-on-task nil)
+        (task-text nil)
+        (current-point (point))
+        (next-task-pos nil))
+    ;; Check if we're on a task line and get the task text
+    (save-excursion
+      (beginning-of-line)
+      (when (looking-at "^  \\[[ *]\\] \\(.+?\\)\\($\\| (in \\|\n\\)")
+        (setq was-on-task t
+              task-text (match-string-no-properties 1))))
+    
+    (when (and was-on-task task-text)
+      ;; Find the position of the next task before refreshing
       (save-excursion
-        (beginning-of-line)
-        (let* ((task-text (match-string 1))
-               (task (replace-regexp-in-string " (in [^)]+)$" "" task-text)))
-          (if (member task task-manager-selected-tasks)
-              (setq task-manager-selected-tasks
-                    (remove task task-manager-selected-tasks))
-            (push task task-manager-selected-tasks))
-          (task-manager-refresh)))
-      ;; Move to next task after refresh
-      (task-manager-next-task))))
+        (forward-line)
+        (while (and (not (eobp))
+                    (not next-task-pos))
+          (if (looking-at "^  \\[[ *]\\]")
+              (setq next-task-pos (point))
+            (forward-line))))
+      
+      ;; Toggle the task selection
+      (let ((task (replace-regexp-in-string " (in [^)]+)$" "" task-text)))
+        (if (member task task-manager-selected-tasks)
+            (setq task-manager-selected-tasks
+                  (remove task task-manager-selected-tasks))
+          (push task task-manager-selected-tasks)))
+      
+      ;; Refresh the display
+      (task-manager-refresh)
+      
+      ;; Move to the next task
+      (if next-task-pos
+          (progn
+            (goto-char next-task-pos)
+            (move-to-column 2)
+            (task-manager-safe-recenter))
+        ;; If no next task in current section, try to find first task in next section
+        (goto-char current-point)
+        (let ((found nil))
+          (while (and (not found)
+                     (not (eobp)))
+            (forward-line)
+            (when (looking-at "^  \\[[ *]\\]")
+              (setq found t)
+              (move-to-column 2)
+              (task-manager-safe-recenter)))
+          (unless found
+            (message "No more tasks")))))))
 
 (defun task-manager-toggle-all-sections ()
   "Toggle expansion state of all sections."
@@ -901,6 +1003,7 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
   (interactive)
   (let* ((section (completing-read "Move all tasks from section: " task-manager-sections))
          (tasks (gethash section task-manager-tasks)))
+         (archived-count 0))
     (when (and tasks
                (yes-or-no-p (format "Move all %d tasks from %s to Archive? " 
                                    (length tasks) section)))
@@ -908,7 +1011,8 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
       (unless (string= section "Archive")
         (dolist (task tasks)
           (let ((archived-task (concat task " (from " section ")")))
-            (push archived-task (gethash "Archive" task-manager-tasks)))))
+            (push archived-task (gethash "Archive" task-manager-tasks))
+            (setq archived-count (1+ archived-count))))
       (setf (gethash section task-manager-tasks) nil)
       (task-manager-save-data)
       (task-manager-refresh)
@@ -938,6 +1042,8 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
         ;; Save and refresh
         (task-manager-save-data)
         (task-manager-refresh)
+        ;; Center the view safely
+        (task-manager-safe-recenter)
         (message "Task updated: %s" new-task)))))
 
 (defun task-manager-move-to-week ()
@@ -966,14 +1072,19 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
     (message "%d task%s moved to Week"
              moved-count (if (= moved-count 1) "" "s"))))
 
+(defun task-manager-collapse-except (target-section)
+  "Collapse all sections except TARGET-SECTION."
+  (dolist (section task-manager-sections)
+    (puthash section (string= section target-section) task-manager-expanded-sections)))
+
 (defun task-manager-focus-inbox ()
-  "Focus on the Inbox section."
+  "Focus on the Inbox section and collapse others."
   (interactive)
   (goto-char (point-min))
   (if (search-forward "[" nil t)
       (progn
-        ;; Ensure Inbox section is expanded
-        (puthash "Inbox" t task-manager-expanded-sections)
+        ;; Collapse all sections except Inbox
+        (task-manager-collapse-except "Inbox")
         ;; Refresh to ensure expansion state is applied
         (task-manager-refresh)
         ;; Find and move to the Inbox section
@@ -981,18 +1092,19 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
         (if (search-forward "[-] Inbox" nil t)
             (progn
               (forward-line 1)
+              (task-manager-safe-recenter)
               (message "Focused on Inbox"))
           (message "Inbox section not found")))
     (message "Could not locate sections")))
 
 (defun task-manager-focus-today ()
-  "Focus on the Today section."
+  "Focus on the Today section and collapse others."
   (interactive)
   (goto-char (point-min))
   (if (search-forward "[" nil t)
       (progn
-        ;; Ensure Today section is expanded
-        (puthash "Today" t task-manager-expanded-sections)
+        ;; Collapse all sections except Today
+        (task-manager-collapse-except "Today")
         ;; Refresh to ensure expansion state is applied
         (task-manager-refresh)
         ;; Find and move to the Today section
@@ -1000,18 +1112,19 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
         (if (search-forward "[-] Today" nil t)
             (progn
               (forward-line 1)
+              (task-manager-safe-recenter)
               (message "Focused on Today"))
           (message "Today section not found")))
     (message "Could not locate sections")))
 
 (defun task-manager-focus-week ()
-  "Focus on the Week section."
+  "Focus on the Week section and collapse others."
   (interactive)
   (goto-char (point-min))
   (if (search-forward "[" nil t)
       (progn
-        ;; Ensure Week section is expanded
-        (puthash "Week" t task-manager-expanded-sections)
+        ;; Collapse all sections except Week
+        (task-manager-collapse-except "Week")
         ;; Refresh to ensure expansion state is applied
         (task-manager-refresh)
         ;; Find and move to the Week section
@@ -1019,18 +1132,19 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
         (if (search-forward "[-] Week" nil t)
             (progn
               (forward-line 1)
+              (task-manager-safe-recenter)
               (message "Focused on Week"))
           (message "Week section not found")))
     (message "Could not locate sections")))
 
 (defun task-manager-focus-monday ()
-  "Focus on the Monday section."
+  "Focus on the Monday section and collapse others."
   (interactive)
   (goto-char (point-min))
   (if (search-forward "[" nil t)
       (progn
-        ;; Ensure Monday section is expanded
-        (puthash "Monday" t task-manager-expanded-sections)
+        ;; Collapse all sections except Monday
+        (task-manager-collapse-except "Monday")
         ;; Refresh to ensure expansion state is applied
         (task-manager-refresh)
         ;; Find and move to the Monday section
@@ -1038,18 +1152,19 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
         (if (search-forward "[-] Monday" nil t)
             (progn
               (forward-line 1)
+              (task-manager-safe-recenter)
               (message "Focused on Monday"))
           (message "Monday section not found")))
     (message "Could not locate sections")))
 
 (defun task-manager-focus-calendar ()
-  "Focus on the Calendar section."
+  "Focus on the Calendar section and collapse others."
   (interactive)
   (goto-char (point-min))
   (if (search-forward "[" nil t)
       (progn
-        ;; Ensure Calendar section is expanded
-        (puthash "Calendar" t task-manager-expanded-sections)
+        ;; Collapse all sections except Calendar
+        (task-manager-collapse-except "Calendar")
         ;; Refresh to ensure expansion state is applied
         (task-manager-refresh)
         ;; Find and move to the Calendar section
@@ -1057,18 +1172,19 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
         (if (search-forward "[-] Calendar" nil t)
             (progn
               (forward-line 1)
+              (task-manager-safe-recenter)
               (message "Focused on Calendar"))
           (message "Calendar section not found")))
     (message "Could not locate sections")))
 
 (defun task-manager-focus-someday ()
-  "Focus on the Someday section."
+  "Focus on the Someday section and collapse others."
   (interactive)
   (goto-char (point-min))
   (if (search-forward "[" nil t)
       (progn
-        ;; Ensure Someday section is expanded
-        (puthash "Someday" t task-manager-expanded-sections)
+        ;; Collapse all sections except Someday
+        (task-manager-collapse-except "Someday")
         ;; Refresh to ensure expansion state is applied
         (task-manager-refresh)
         ;; Find and move to the Someday section
@@ -1076,18 +1192,19 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
         (if (search-forward "[-] Someday" nil t)
             (progn
               (forward-line 1)
+              (task-manager-safe-recenter)
               (message "Focused on Someday"))
           (message "Someday section not found")))
     (message "Could not locate sections")))
 
 (defun task-manager-focus-archive ()
-  "Focus on the Archive section."
+  "Focus on the Archive section and collapse others."
   (interactive)
   (goto-char (point-min))
   (if (search-forward "[" nil t)
       (progn
-        ;; Ensure Archive section is expanded
-        (puthash "Archive" t task-manager-expanded-sections)
+        ;; Collapse all sections except Archive
+        (task-manager-collapse-except "Archive")
         ;; Refresh to ensure expansion state is applied
         (task-manager-refresh)
         ;; Find and move to the Archive section
@@ -1095,6 +1212,7 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
         (if (search-forward "[-] Archive" nil t)
             (progn
               (forward-line 1)
+              (task-manager-safe-recenter)
               (message "Focused on Archive"))
           (message "Archive section not found")))
     (message "Could not locate sections")))
