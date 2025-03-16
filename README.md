@@ -2,14 +2,14 @@
 
 # Configuration
 
-1. Add the path to your local `task-manager.el`
+1. Adjust the path to your local `task-manager.el`
    
    #+end_srcelisp
    (add-to-list 'load-path "/Users/juanmanuelferreradiaz/.emacs.d/site-lisp/task-manager/")
    (require 'task-manager)
    #+begin_src
    
-2. Define the file path for saving tasks
+2. Declare the file path for saving tasks
    
    #+end_srcelisp
    (defcustom task-manager-save-file
