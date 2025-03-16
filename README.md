@@ -98,7 +98,7 @@ The calendar functionality streamlines task management, ensuring visibility of d
 - `n` / `p`: Move to next/previous task.
 - `RET`: Edit the task under the cursor.
 
-# Final Remark
+# Credits
 
 This software is based on GTD+R paper system by Kenji Ohta:
 https://gtd-r.blogspot.com/
