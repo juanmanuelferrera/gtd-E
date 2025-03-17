@@ -7,20 +7,17 @@ https://github.com/user-attachments/assets/62a2f126-f04b-4247-9136-489ea60d5638
 
 1. Adjust the path to your local `task-manager.el`
    
-   #+end_srcelisp
    (add-to-list 'load-path "/Users/juanmanuelferreradiaz/.emacs.d/site-lisp/task-manager/")
    (require 'task-manager)
-   #+begin_src
-   
+
 2. Declare the path to the folder where tasks.org lives for saving tasks
    
-   #+end_srcelisp
    (defcustom task-manager-save-file
      (expand-file-name "tasks.org" "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloudcomappsonthemove~beorg/Documents/my-gtd/")
      "File where task manager data is saved."
      :type 'file
      :group 'task-manager)
-   #+begin_src 
+
 
 # GTD+E Task Manager Overview
 
