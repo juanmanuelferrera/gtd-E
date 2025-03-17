@@ -23,9 +23,9 @@ https://github.com/user-attachments/assets/62a2f126-f04b-4247-9136-489ea60d5638
      :group 'task-manager)
 
 
-# GTD+E Task Manager Overview
+# Gtd+E Task Manager Overview
 
-The GTD+E Task Manager is a simple elisp-based system for integrating the Getting Things Done (GTD) methodology with enhanced task organization. It provides sections for different tasks, allowing efficient tracking and prioritizing.
+The Gtd+E Task Manager is a simple elisp-based system for integrating the Getting Things Done (GTD) methodology with enhanced task organization. It provides sections for different tasks, allowing efficient tracking and prioritizing.
 
 ## Task Sections
 
@@ -101,7 +101,7 @@ The calendar functionality streamlines task management, ensuring visibility of d
 
 # Credits
 
-This software is based on GTD+R paper system by Kenji Ohta:
+This software is based on Gtd+R paper system by Kenji Ohta:
 https://gtd-r.blogspot.com/
 
 https://github.com/user-attachments/assets/6ab7d15c-89c4-46ce-a318-6e5169e6b687
