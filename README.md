@@ -15,8 +15,11 @@ https://github.com/user-attachments/assets/62a2f126-f04b-4247-9136-489ea60d5638
    
    (defcustom task-manager-save-file
      (expand-file-name "tasks.org" "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloudcomappsonthemove~beorg/Documents/my-gtd/")
+   
      "File where task manager data is saved."
+   
      :type 'file
+   
      :group 'task-manager)
 
 
