@@ -19,3 +19,4 @@ Adjust the backup directory and the address of your tasks.org
             (delete-file (expand-file-name (car (sort backups #'string<)) backup-directory))))))))
 
 (add-hook 'after-save-hook 'my-backup-tasks-on-change)
+#+end_src
