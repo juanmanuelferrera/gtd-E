@@ -305,41 +305,14 @@
                  (task (cdr task-pair))
                  (selected (member task task-manager-selected-tasks)))
             (insert (format "  [%s] " (if selected "*" " ")))
-            ;; Make task text clickable for editing with proper link handling
-            (let ((start 0)
-                  (button-start (point)))
-              (while (string-match "\\(https?://[^\s\n]+\\)" task start)
-                (let ((link-start (match-beginning 1))
-                      (link-end (match-end 1))
-                      (link (match-string 1 task)))
-                  ;; Make text before link clickable for editing
-                  (let ((text-before (substring task start link-start)))
-                    (unless (string-empty-p text-before)
-                      (insert-text-button text-before
-                                        'face (if selected 'bold 'default)
-                                        'follow-link t
-                                        'task task
-                                        'section section
-                                        'action #'task-manager-edit-task-inline
-                                        'help-echo "Click to edit task")))
-                  ;; Insert clickable link
-                  (insert-text-button link
-                                    'face 'link
-                                    'follow-link t
-                                    'action (lambda (_) 
-                                            (browse-url link))
-                                    'help-echo "Click to open link")
-                  (setq start link-end)))
-              ;; Make remaining text clickable for editing
-              (let ((remaining-text (substring task start)))
-                (unless (string-empty-p remaining-text)
-                  (insert-text-button remaining-text
-                                    'face (if selected 'bold 'default)
-                                    'follow-link t
-                                    'task task
-                                    'section section
-                                    'action #'task-manager-edit-task-inline
-                                    'help-echo "Click to edit task"))))
+            ;; Make task text clickable for editing
+            (insert-text-button task
+                              'face (if selected 'bold 'default)
+                              'follow-link t
+                              'task task
+                              'section section
+                              'action #'task-manager-edit-task-inline
+                              'help-echo "Click to edit task")
             (insert (format " (in %s)\n" section))))
         (insert "\n============\n\n")))
     
@@ -958,9 +931,14 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
                                        (goto-char (point-min))
                                        (forward-line 2)
                                        (point)))
+                            (end-pos (save-excursion
+                                     (goto-char (point-max))
+                                     (search-backward "[C-c")
+                                     (beginning-of-line)
+                                     (point))))
                         (setq result
                               (split-string
-                               (string-trim (buffer-substring-no-properties start-pos (point-max)))
+                               (string-trim (buffer-substring-no-properties start-pos end-pos))
                                "\n" t "[ \t\n\r]+")))
                       (setq done t)
                       (exit-recursive-edit)))
@@ -1024,7 +1002,7 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
   "Move all tasks in a section to Archive."
   (interactive)
   (let* ((section (completing-read "Move all tasks from section: " task-manager-sections))
-         (tasks (gethash section task-manager-tasks))
+         (tasks (gethash section task-manager-tasks)))
          (archived-count 0))
     (when (and tasks
                (yes-or-no-p (format "Move all %d tasks from %s to Archive? " 
@@ -1034,7 +1012,7 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
         (dolist (task tasks)
           (let ((archived-task (concat task " (from " section ")")))
             (push archived-task (gethash "Archive" task-manager-tasks))
-            (setq archived-count (1+ archived-count)))))
+            (setq archived-count (1+ archived-count))))
       (setf (gethash section task-manager-tasks) nil)
       (task-manager-save-data)
       (task-manager-refresh)
