@@ -1,8 +1,8 @@
-* How to make a backup of a file regularly every two hours 
+# How to make a backup of a file regularly every two hours 
 
 You can use the cron utility. Here's how you can set it up:
 
-* Step 1: Create a Backup Script
+## Step 1: Create a Backup Script
 First, create a simple script that copies your file to a backup location. You can use the cp command for this purpose.
 
 Open your text editor and create a file named backup.sh.
@@ -15,7 +15,7 @@ cp /path/to/your/file.txt /path/to/backup/location/
 
 Save the file.
 
-* Step 2: Make the Script Executable
+## Step 2: Make the Script Executable
 You need to make the script executable by running:
 
 bash
@@ -35,7 +35,7 @@ bash
 0 */2 * * * /path/to/your/backup.sh
 This will run the backup.sh script every two hours on the hour (e.g., 12:00 AM, 2:00 AM, etc.).
 
-* Testing the Setup
+## Testing the Setup
 
 Run the script manually once to ensure it works as expected.
 
