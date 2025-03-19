@@ -579,24 +579,28 @@ PROMPT is shown to user, INITIAL-TEXT is optional starting text."
    section))
 
 (defun task-manager-delete-tasks ()
-  "Delete Calendar tasks and move other tasks to Archive section."
+  "Delete Archive tasks permanently. Move other tasks to Archive section."
   (interactive)
   (when task-manager-selected-tasks
     (let ((deleted-count 0)
-          (archived-count 0))
+          (archived-count 0)
+          (current-section (save-excursion
+                             (while (and (not (looking-at "\\[[-+]\\] \\(.+\\)$"))
+                                       (> (point) (point-min)))
+                               (forward-line -1))
+                             (when (looking-at "\\[[-+]\\] \\(.+\\)$")
+                               (match-string 1)))))
       (dolist (task task-manager-selected-tasks)
         (dolist (section task-manager-sections)
           (let ((tasks (gethash section task-manager-tasks)))
             (when (member task tasks)
               (setf (gethash section task-manager-tasks)
                     (remove task tasks))
-              ;; Calendar tasks and tasks with today's date are deleted, others are archived
-              (if (or (string= section "Calendar")
-                      (string-match-p (format-time-string task-manager-date-format) task))
+              ;; Permanently delete tasks from Archive section
+              ;; Archive tasks from other sections
+              (if (string= section "Archive")
                   (setq deleted-count (1+ deleted-count))
-                (let ((archived-task (if (string= section "Archive")
-                                       task
-                                     (concat task " (from " section ")"))))
+                (let ((archived-task (concat task " (from " section ")")))
                   (push archived-task (gethash "Archive" task-manager-tasks))
                   (setq archived-count (1+ archived-count))))))))
       (setq task-manager-selected-tasks nil)
