@@ -1,22 +1,46 @@
-Put this in your config if you do not have a backup service for tasks.org
-It makes a backup of tasks.org automatically whrn detects changes
-Adjust the backup directory and the address of your tasks.org
+* How to make a backup of a file regularly every two hours 
 
-* tasks.org backup
-#+begin_src emacs-lisp
-(defun my-backup-tasks-on-change ()
-  "Backup tasks.org whenever it's changed, keeping a maximum of 10 backups."
-  (let ((tasks-file "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/tasks.org")
-        (backup-directory "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/backups/"))
-    (when (and (file-exists-p tasks-file)
-               (file-newer-than-file-p tasks-file (expand-file-name "latest-backup.org" backup-directory)))
-      (let ((timestamp (format-time-string "%Y%m%d%H%M%S"))
-            (backup-file (expand-file-name (concat (file-name-nondirectory tasks-file) "." timestamp) backup-directory)))
-        (copy-file tasks-file backup-file t)
-        ;; Maintain only the latest 10 backups
-        (let ((backups (directory-files backup-directory nil "\\`tasks\\.org\\.\\([0-9]+\\)")))
-          (when (> (length backups) 10)
-            (delete-file (expand-file-name (car (sort backups #'string<)) backup-directory))))))))
+You can use the cron utility. Here's how you can set it up:
 
-(add-hook 'after-save-hook 'my-backup-tasks-on-change)
-#+end_src
+* Step 1: Create a Backup Script
+First, create a simple script that copies your file to a backup location. You can use the cp command for this purpose.
+
+Open your text editor and create a file named backup.sh.
+
+Add the following lines to the script, replacing /path/to/your/file.txt with the path to your file and /path/to/backup/location/ with where you want to save the backup:
+
+bash
+#!/bin/bash
+cp /path/to/your/file.txt /path/to/backup/location/
+
+Save the file.
+
+* Step 2: Make the Script Executable
+You need to make the script executable by running:
+
+bash
+chmod +x /path/to/your/backup.sh
+
+Replace /path/to/your/backup.sh with the actual path where you saved the script.
+
+Step 3: Schedule the Backup with Cron
+Open the crontab editor by running:
+
+bash
+crontab -e
+
+Add the following line to schedule the backup every two hours:
+
+bash
+0 */2 * * * /path/to/your/backup.sh
+This will run the backup.sh script every two hours on the hour (e.g., 12:00 AM, 2:00 AM, etc.).
+
+* Testing the Setup
+
+Run the script manually once to ensure it works as expected.
+
+Run it using: ./script.sh
+
+Check the cron logs or manually verify that backups are being created at the scheduled times.
+
+By following these steps, you'll have a regular backup of your file every two hours.
