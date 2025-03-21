@@ -1,7 +1,5 @@
 # How to make a backup of a file regularly every two hours 
 
-You can use the cron utility. Here's how you can set it up:
-
 ## Step 1: Create a Backup Script
 First, create a simple script that copies your file to a backup location. You can use the cp command for this purpose.
 
@@ -9,9 +7,13 @@ Open your text editor and create a file named backup.sh.
 
 Add the following lines to the script, replacing /path/to/your/file.txt with the path to your file and /path/to/backup/location/ with where you want to save the backup:
 
-bash
 #!/bin/bash
-cp /path/to/your/file.txt /path/to/backup/location/
+
+SOURCE_FILE="/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/tasks.org"
+BACKUP_DIR="/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/backups/"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+cp "$SOURCE_FILE" "$BACKUP_DIR/backup_$TIMESTAMP"bash
 
 Save the file.
 
