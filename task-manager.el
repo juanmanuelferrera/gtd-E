@@ -1,13 +1,53 @@
-;;; task-manager.el --- Simple task manager with sections -*- lexical-binding: t -*-
+;;; task-manager2.el --- Enhanced task manager -*- lexical-binding: t -*-
 
 ;; Author: Assistant
 ;; Keywords: task management, todo
-;; Version: 1.0
+;; Version: 2.0
 ;; Package-Requires: ((emacs "25.1") (org "9.3"))
 
 ;;; Commentary:
-;; A simple task manager with sections for Inbox, Today, Week, Monday, Calendar, Someday, and Archive
-;; Use 'a' to add tasks, 'd' to delete, 'm' to move, and 'e' to expand/collapse sections
+;; A comprehensive task manager with sections for Inbox, Today, Week, etc.
+;; Added functionalities: search, recurring tasks, priorities, reminders, tags, and export/import.
+;; 
+;; Key commands:
+;;  a: Add a single task
+;;  A: Add multiple tasks
+;;  k: Delete selected tasks (move to Archive)
+;;  K: Delete all tasks in a section
+;;  m: Move selected tasks to another section
+;;  RET: Edit task at current position
+;;  z: Toggle expansion of all sections
+;;  S: Search tasks
+;;  s: Focus on Someday section
+;;  r: Set task as recurring (daily, weekly, monthly)
+;;  R: Clear recurring status
+;;  V: View all recurring tasks
+;;  F: Focus on Archive section
+;;  p: Move to previous task
+;;  d: Set due date
+;;  D: Clear due date
+;;  T: Add tags
+;;  t: Focus on Today section
+;;  w: Focus on Week section
+;;  W: Move all tasks from Inbox and Today to Week
+;;  o: Focus on Monday section
+;;  c: Focus on Calendar section
+;;  C: Toggle commands visibility
+;;  f: Filter tasks by properties
+;;  X: Set reminders
+;;  b: Bulk edit selected tasks
+;;  x: Export tasks (org, json, csv)
+;;  I: Import tasks
+;;  i: Focus on Inbox section
+;;  v: Save tasks
+;;  L: Load tasks
+;;  SPC: Toggle task selection
+;;  u: Undo (up to 15 operations)
+;; 
+;; Features:
+;;  - URLs and file paths in tasks are automatically clickable
+;; 
+;; To start: M-x task-manager2-init
 
 ;;; Code:
 
@@ -19,7 +59,7 @@
 
 (defvar task-manager-sections
   '("Inbox" "Today" "Week" "Monday" "Calendar" "Someday" "Archive")
-  "List of available sections.")
+  "List of sections for organizing tasks.")
 
 (defvar task-manager-tasks (make-hash-table :test 'equal)
   "Hash table storing tasks for each section.")
@@ -30,1197 +70,1393 @@
 (defvar-local task-manager-expanded-sections (make-hash-table :test 'equal)
   "Hash table tracking expanded/collapsed state of sections.")
 
-(defvar-local task-manager-all-expanded t
-  "Flag indicating if all sections are expanded.")
+(defvar task-manager-save-file 
+  (expand-file-name "~/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/tasks.org")
+  "File where task manager data is saved.")
 
-(defvar-local task-manager-edit-mode nil
-  "Flag indicating if edit mode is active.")
+;; Add commands visibility toggle variable
+(defvar-local task-manager-show-commands nil
+  "Whether to show commands in the task manager buffer.")
 
-(defvar-local task-manager-move-source nil
-  "Temporarily stores the source section during a move-all operation.")
+;; Add undo system - history of task states
+(defvar task-manager-undo-history nil
+  "Stack to keep track of task states for undo functionality.")
 
-(defvar task-manager-mode-map
-  (let ((map (make-sparse-keymap)))
-    ;; Define all keybindings
-    (define-key map (kbd "a") 'task-manager-add-task)
-    (define-key map (kbd "A") 'task-manager-add-multiple-tasks)
-    (define-key map (kbd "k") 'task-manager-delete-tasks)
-    (define-key map (kbd "K") 'task-manager-delete-all-tasks-in-section)
-    (define-key map (kbd "D") 'task-manager-delete-all-tasks)
-    (define-key map (kbd "m") 'task-manager-move-tasks)
-    (define-key map (kbd "M") 'task-manager-move-all-tasks-in-section)
-    (define-key map (kbd "e") 'task-manager-toggle-section)
-    (define-key map (kbd "z") 'task-manager-toggle-all-sections)
-    (define-key map (kbd "f") 'task-manager-toggle-focus)
-    (define-key map (kbd "d") 'task-manager-toggle-edit-mode)
-    (define-key map (kbd "x") 'task-manager-archive-tasks)
-    (define-key map (kbd "n") 'task-manager-next-task)
-    (define-key map (kbd "p") 'task-manager-previous-task)
-    (define-key map (kbd "SPC") 'task-manager-toggle-task)
-    (define-key map (kbd "RET") 'task-manager-edit-task)
-    (define-key map (kbd "* s") 'task-manager-toggle-all-tasks-in-section)
-    (define-key map (kbd "* a") 'task-manager-toggle-all-tasks)
-    (define-key map (kbd "C-c d") 'task-manager-insert-date-from-calendar)
-    (define-key map (kbd "C-k") 'task-manager-permanently-delete-tasks)
-    (define-key map (kbd "X") 'task-manager-empty-recycle-bin)
-    (define-key map (kbd "W") 'task-manager-move-to-week)
-    (define-key map (kbd "i") 'task-manager-focus-inbox)
-    (define-key map (kbd "t") 'task-manager-focus-today)
-    (define-key map (kbd "w") 'task-manager-focus-week)
-    (define-key map (kbd "o") 'task-manager-focus-monday)
-    (define-key map (kbd "c") 'task-manager-focus-calendar)
-    (define-key map (kbd "s") 'task-manager-focus-someday)
-    (define-key map (kbd "r") 'task-manager-focus-archive)
-    map)
-  "Keymap for `task-manager-mode'.")
+(defvar task-manager-undo-history-size 15
+  "Maximum number of states to keep in the undo history.")
+
+(defun task-manager-get-task-at-point ()
+  "Get the task at the current point, returning a cons of (section . task)."
+  (let ((task-found nil)
+        (task-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+    
+    ;; Check if we're on a task line
+    (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)$" task-line)
+      (let ((task-text (match-string 2 task-line))
+            (section nil)
+            (original-task nil))
+        
+        ;; Find the section and original task
+        (dolist (sec task-manager-sections)
+          (let ((tasks (gethash sec task-manager-tasks)))
+            (dolist (full-task tasks)
+              (when (string-match-p (regexp-quote task-text) full-task)
+                (setq section sec)
+                (setq original-task full-task)
+                (setq task-found t)))))
+        
+        ;; Also check for "Due Today" tasks with section info in parenthesis
+        (unless task-found
+          (when (string-match "\\[\\([X ]\\)\\] \\(.*\\) (in \\(.*\\))" task-line)
+            (setq task-text (match-string 2 task-line))
+            (setq section (match-string 3 task-line))
+            
+            (let ((tasks (gethash section task-manager-tasks)))
+              (dolist (full-task tasks)
+                (when (string-match-p (regexp-quote task-text) full-task)
+                  (setq original-task full-task)
+                  (setq task-found t))))))
+        
+        ;; Return a cons of (section . task) if found
+        (when task-found
+          (cons section original-task))))))
+
+(defun task-manager-find-task-section (task)
+  "Find the section that contains TASK."
+  (let ((section-found nil))
+    (dolist (section task-manager-sections)
+      (let ((tasks (gethash section task-manager-tasks)))
+        (when (and (not section-found) (member task tasks))
+          (setq section-found section))))
+    section-found))
+
+(defun task-manager-all-tasks ()
+  "Get a list of all tasks from all sections."
+  (let ((all-tasks nil))
+    (dolist (section task-manager-sections)
+      (setq all-tasks (append all-tasks (gethash section task-manager-tasks))))
+    all-tasks))
+
+(defun task-manager-clear-recurring ()
+  "Clear the recurring status from a task. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to clear recurring: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         ;; Remove any existing recurring tag
+         (new-task (replace-regexp-in-string "\\[Recurring: [^]]*\\]" "" task))
+         (new-task (string-trim new-task)))
+    
+    ;; Replace old task with new one
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Recurring status cleared.")))
+
+;;;###autoload
+(defun task-manager2-init ()
+  "Initialize the task manager."
+  (interactive)
+  ;; Initialize sections in hash table if needed
+  (dolist (section task-manager-sections)
+    (unless (gethash section task-manager-tasks)
+      (puthash section '() task-manager-tasks)
+      (puthash section t task-manager-expanded-sections)))
+  
+  ;; Try to load existing tasks
+  (when (fboundp 'task-manager-load-tasks)
+    (task-manager-load-tasks))
+  
+  ;; Open buffer
+  (let ((buffer (get-buffer-create "*Task Manager*")))
+    (with-current-buffer buffer
+      (task-manager-mode)
+      ;; Ensure commands are hidden on startup
+      (setq-local task-manager-show-commands nil)
+      (task-manager-refresh))
+    (switch-to-buffer buffer)))
 
 (define-derived-mode task-manager-mode special-mode "Task Manager"
   "Major mode for task management."
   (buffer-disable-undo)
-  (setq buffer-read-only t))
+  (setq buffer-read-only t)
+  ;; Set up key bindings
+  (define-key task-manager-mode-map (kbd "a") 'task-manager-add-task)
+  (define-key task-manager-mode-map (kbd "A") 'task-manager-add-multiple-tasks)
+  (define-key task-manager-mode-map (kbd "k") 'task-manager-delete-tasks)
+  (define-key task-manager-mode-map (kbd "K") 'task-manager-delete-section-tasks)
+  (define-key task-manager-mode-map (kbd "m") 'task-manager-move-tasks)
+  (define-key task-manager-mode-map (kbd "RET") 'task-manager-edit-task-at-point)
+  (define-key task-manager-mode-map (kbd "z") 'task-manager-toggle-all-sections)
+  (define-key task-manager-mode-map (kbd "S") 'task-manager-search-tasks)
+  (define-key task-manager-mode-map (kbd "s") 'task-manager-focus-someday)
+  (define-key task-manager-mode-map (kbd "r") 'task-manager-set-recurring)
+  (define-key task-manager-mode-map (kbd "R") 'task-manager-clear-recurring)
+  (define-key task-manager-mode-map (kbd "V") 'task-manager-view-recurring)
+  (define-key task-manager-mode-map (kbd "F") 'task-manager-focus-archive)
+  (define-key task-manager-mode-map (kbd "p") 'task-manager-previous-task)
+  (define-key task-manager-mode-map (kbd "d") 'task-manager-set-due-date)
+  (define-key task-manager-mode-map (kbd "D") 'task-manager-clear-due-date)
+  (define-key task-manager-mode-map (kbd "T") 'task-manager-add-tags)
+  (define-key task-manager-mode-map (kbd "t") 'task-manager-focus-today)
+  (define-key task-manager-mode-map (kbd "w") 'task-manager-focus-week)
+  (define-key task-manager-mode-map (kbd "W") 'task-manager-move-to-week)
+  (define-key task-manager-mode-map (kbd "o") 'task-manager-focus-monday)
+  (define-key task-manager-mode-map (kbd "c") 'task-manager-focus-calendar)
+  (define-key task-manager-mode-map (kbd "C") 'task-manager-toggle-commands)
+  (define-key task-manager-mode-map (kbd "f") 'task-manager-filter-tasks)
+  (define-key task-manager-mode-map (kbd "X") 'task-manager-setting-reminders)
+  (define-key task-manager-mode-map (kbd "b") 'task-manager-bulk-edit)
+  (define-key task-manager-mode-map (kbd "x") 'task-manager-export)
+  (define-key task-manager-mode-map (kbd "I") 'task-manager-import)
+  (define-key task-manager-mode-map (kbd "i") 'task-manager-focus-inbox)
+  (define-key task-manager-mode-map (kbd "v") 'task-manager-save-tasks)
+  (define-key task-manager-mode-map (kbd "L") 'task-manager-load-tasks)
+  (define-key task-manager-mode-map (kbd "SPC") 'task-manager-toggle-task-at-point))
 
-(defvar task-manager-section-mapping
-  '(("Hoy" . "Today")
-    ("Semana" . "Week")
-    ("Lunes" . "Monday")
-    ("Calendario" . "Calendar")
-    ("Algun Dia" . "Someday")
-    ("Archivo" . "Archive"))
-  "Mapping of old section names to new ones.")
+;; Add the undo keybinding explicitly after mode definition
+(define-key task-manager-mode-map (kbd "u") 'task-manager-undo)
 
-(defvar task-manager-date-format "%Y-%m-%d"
-  "Format for dates in tasks.")
+;; Add the clear due date keybinding explicitly after mode definition
+(define-key task-manager-mode-map (kbd "D") 'task-manager-clear-due-date)
 
-(defvar task-manager-task-cache nil
-  "Cache of recently added or modified tasks.")
-
-(defvar task-manager-last-save-time nil
-  "Timestamp of the last save operation.")
-
-(defun task-manager-migrate-sections ()
-  "Migrate tasks from old section names to new ones."
-  (let ((migrated-tasks (make-hash-table :test 'equal)))
-    ;; First, initialize all new sections with empty lists
-    (dolist (section task-manager-sections)
-      (puthash section nil migrated-tasks))
-    
-    ;; Migrate tasks from old sections to new ones
-    (maphash
-     (lambda (section tasks)
-       (when tasks  ; Only process sections with tasks
-         (let ((new-section
-                (or (cdr (assoc section task-manager-section-mapping))
-                    (and (member section task-manager-sections) section))))
-           (when new-section  ; If we have a valid target section
-             (puthash new-section
-                      (append tasks (gethash new-section migrated-tasks))
-                      migrated-tasks)))))
-     task-manager-tasks)
-    
-    ;; Replace the old task hash with the migrated one
-    (setq task-manager-tasks migrated-tasks)
-    (task-manager-save-data)))
-
-(defcustom task-manager-save-file 
-  (expand-file-name "tasks.org" "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/")
-  "File where task manager data is saved."
-  :type 'file
-  :group 'task-manager)
-
-;;;###autoload
-(defun task-manager-init ()
-  "Initialize the task manager."
+(defun task-manager-toggle-commands ()
+  "Toggle the visibility of the commands section."
   (interactive)
-  (let ((buffer (get-buffer-create "*Task Manager*")))
-    (with-current-buffer buffer
-      (unless (eq major-mode 'task-manager-mode)
-        (task-manager-mode))
-      (setq buffer-read-only t)
-      ;; Initialize all sections with empty lists
-      (clrhash task-manager-tasks)
-      (dolist (section task-manager-sections)
-        (puthash section nil task-manager-tasks))
-      ;; Load existing tasks
-      (task-manager-load-data)
-      ;; Initialize expanded state for all sections
-      (dolist (section task-manager-sections)
-        (puthash section t task-manager-expanded-sections))
-      ;; Set up auto-save
-      (add-hook 'kill-buffer-hook #'task-manager-ensure-save nil t)
-      ;; Add hook to save tasks when Emacs is closing
-      (add-hook 'kill-emacs-hook #'task-manager-save-data)
-      (task-manager-refresh))
-    (switch-to-buffer buffer)))
+  (setq task-manager-show-commands (not task-manager-show-commands))
+  (task-manager-refresh)
+  (message "Commands %s" (if task-manager-show-commands "shown" "hidden")))
 
-(defun task-manager-ensure-save ()
-  "Ensure tasks are saved before killing the buffer."
-  (when (eq major-mode 'task-manager-mode)
-    (task-manager-save-data)))
-
-(defun task-manager-save-data ()
-  "Save task manager data to org file."
-  (interactive)
-  (make-directory (file-name-directory task-manager-save-file) t)
+(defun task-manager-linkify-text (text)
+  "Make URLs and file paths in TEXT clickable."
   (with-temp-buffer
-    ;; Enable org-mode for proper handling of org syntax
-    (org-mode)
-    (insert "#+TITLE: GTD Tasks\n")
-    (insert "#+STARTUP: overview\n\n")
-    ;; Save each section and its tasks
-    (dolist (section task-manager-sections)
-      (let ((tasks (gethash section task-manager-tasks)))
-        (when tasks  ; Only write sections that have tasks
-          (insert (format "* %s\n" section))
-          (dolist (task tasks)
-            (insert (format "** TODO %s\n" task)))
-          (insert "\n"))))
-    ;; Save buffer to file
-    (write-region (point-min) (point-max) task-manager-save-file))
-  ;; Update last save time
-  (setq task-manager-last-save-time (current-time))
-  (message "Tasks saved to %s" task-manager-save-file))
-
-(defun task-manager-load-data ()
-  "Load task manager data from org file."
-  (interactive)
-  ;; Initialize empty lists for all sections
-  (clrhash task-manager-tasks)
-  (dolist (section task-manager-sections)
-    (puthash section nil task-manager-tasks))
-  
-  (when (file-exists-p task-manager-save-file)
-    ;; Read and parse org file
-    (with-temp-buffer
-      ;; Enable org-mode for proper handling of org syntax
-      (org-mode)
-      (insert-file-contents task-manager-save-file)
-      (goto-char (point-min))
-      (let (current-section)
-        (while (not (eobp))
-          (cond
-           ;; Section header
-           ((looking-at "^\\* \\(.+\\)$")
-            (setq current-section (match-string 1)))
-           ;; Task line (TODO state)
-           ((and current-section
-                 (looking-at "^\\*\\* TODO \\(.+\\)$"))
-            (let ((task (match-string 1)))
-              (when (and task (not (string-empty-p (string-trim task))))
-                (push task (gethash current-section task-manager-tasks))))))
-          (forward-line))))
-    (message "Tasks loaded from %s" task-manager-save-file)))
-
-(defun task-manager-clean-empty-tasks ()
-  "Remove all empty or whitespace-only tasks from all sections."
-  (dolist (section task-manager-sections)
-    (let ((tasks (gethash section task-manager-tasks)))
-      (setf (gethash section task-manager-tasks)
-            (cl-remove-if (lambda (task)
-                           (or (null task)
-                               (string-empty-p (string-trim task))))
-                         tasks)))))
-
-(defun task-manager-get-todays-tasks ()
-  "Get all tasks that contain today's date."
-  (let* ((today (format-time-string "%Y-%m-%d"))
-         (todays-tasks nil))
-    (dolist (section task-manager-sections)
-      (let ((tasks (gethash section task-manager-tasks)))
-        (dolist (task tasks)
-          (when (string-match-p today task)
-            (push (cons section task) todays-tasks)))))
-    (nreverse todays-tasks)))
-
-(defun task-manager-parse-date-from-task (task)
-  "Extract date from TASK string in format YYYY-MM-DD or <YYYY-MM-DD Day>."
-  (let ((date nil))
-    ;; Try to match <YYYY-MM-DD Day> format
-    (if (string-match "<\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\) [A-Za-z]\\{3\\}>" task)
-        (setq date (match-string 1 task))
-      ;; Try to match YYYY-MM-DD format
-      (when (string-match "\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)" task)
-        (setq date (match-string 1 task))))
-    date))
-
-(defun task-manager-date-to-days (date-str)
-  "Convert DATE-STR in format YYYY-MM-DD to days since epoch."
-  (when date-str
-    (let ((year (string-to-number (substring date-str 0 4)))
-          (month (string-to-number (substring date-str 5 7)))
-          (day (string-to-number (substring date-str 8 10))))
-      (calendar-absolute-from-gregorian (list month day year)))))
-
-(defun task-manager-sort-tasks-by-date (tasks)
-  "Sort TASKS by date, with dates closer to today appearing first."
-  (let* ((today (calendar-absolute-from-gregorian 
-                (calendar-current-date)))
-         (tasks-with-dates
-          (mapcar (lambda (task)
-                    (let* ((date-str (task-manager-parse-date-from-task task))
-                           (days (task-manager-date-to-days date-str))
-                           (distance (if days (abs (- days today)) 999999)))
-                      (list task date-str distance)))
-                  tasks)))
-    ;; Sort by distance from today
-    (setq tasks-with-dates 
-          (sort tasks-with-dates 
-                (lambda (a b) 
-                  (< (nth 2 a) (nth 2 b)))))
-    ;; Extract just the tasks
-    (mapcar #'car tasks-with-dates)))
-
-(defun task-manager-safe-recenter ()
-  "Recenter the window displaying the task manager buffer."
-  (let ((windows (get-buffer-window-list (current-buffer) nil t)))
-    (when windows
-      (with-selected-window (car windows)
-        (recenter)))))
+    (insert text)
+    (goto-char (point-min))
+    ;; Detect and linkify URLs - use a more robust pattern
+    (while (re-search-forward "\\b\\(https?://\\|www\\.\\)[^ \t\n\r,;()\"']+" nil t)
+      (let* ((match (match-string 0))
+             (url (if (string-match-p "^www\\." match)
+                     (concat "http://" match)
+                   match))
+             (bounds (match-data)))
+        (set-text-properties (car bounds) (cadr bounds)
+                             `(face link
+                               mouse-face highlight
+                               help-echo ,(format "mouse-1: visit %s" url)
+                               keymap ,button-map
+                               follow-link t
+                               action (lambda (_) (browse-url ,url))))))
+    
+    ;; Detect and linkify file paths - make pattern more selective
+    (goto-char (point-min))
+    (while (re-search-forward "\\b\\(file://\\|~/\\|/\\)[^ \t\n\r,;()\"']+" nil t)
+      (let* ((match (match-string 0))
+             (file-path (if (string-match-p "^file:" match)
+                           (substring match 5)
+                         match))
+             (bounds (match-data)))
+        (set-text-properties (car bounds) (cadr bounds)
+                             `(face link
+                               mouse-face highlight
+                               help-echo ,(format "mouse-1: open %s" file-path)
+                               keymap ,button-map
+                               follow-link t
+                               action (lambda (_) (find-file ,file-path))))))
+    
+    (buffer-string)))
 
 (defun task-manager-refresh ()
-  "Refresh the task manager display."
-  (task-manager-clean-empty-tasks)
+  "Refresh the display of tasks in the task manager."
   (let ((inhibit-read-only t)
-        (current-line (line-number-at-pos))
-        (current-column (current-column)))
+        (today (format-time-string "%Y-%m-%d")))
     (erase-buffer)
-    (insert "Task Manager")
-    (when task-manager-edit-mode
-      (insert " [EDIT MODE]"))
-    (when task-manager-move-source
-      (insert (format " [Moving from: %s]" task-manager-move-source)))
-    (insert "\n============\n\n")
+    (insert "GTD + E - Task Manager\n")
+    (insert "====================\n\n")
     
-    ;; Sort Calendar tasks by date
-    (let ((calendar-tasks (gethash "Calendar" task-manager-tasks)))
-      (when calendar-tasks
-        (setf (gethash "Calendar" task-manager-tasks)
-              (task-manager-sort-tasks-by-date calendar-tasks))))
+    ;; Display tasks due today at the top
+    (insert (propertize "Due Today" 'face '(:inherit font-lock-keyword-face :weight bold)))
+    (insert " [-]\n")
+    (let ((due-today-tasks nil))
+      ;; Find tasks due today or with daily recurring
+      (dolist (section task-manager-sections)
+        (let ((tasks (gethash section task-manager-tasks)))
+          (dolist (task tasks)
+            (when (or 
+                   ;; Task with today's due date
+                   (and (string-match "\\[Due: \\([^]]+\\)\\]" task)
+                        (string= (match-string 1 task) today))
+                   ;; Daily recurring task
+                   (string-match-p "\\[Recurring: daily\\]" task))
+              (push (cons section task) due-today-tasks)))))
+      
+      (if due-today-tasks
+          (progn
+            (dolist (task-pair due-today-tasks)
+              (let* ((section (car task-pair))
+                     (task (cdr task-pair))
+                     (selected (member task task-manager-selected-tasks))
+                     (display-task (replace-regexp-in-string "^TODAY " "" task)))
+                ;; Make links clickable in display-task
+                (insert (format "  [%s] " (if selected "X" " ")))
+                (insert (task-manager-linkify-text display-task))
+                (insert (format " (in %s)\n" section))))
+            (insert "\n"))
+        (insert "  No tasks due today\n\n")))
     
-    ;; Display today's tasks at the top if any exist
-    (let ((todays-tasks (task-manager-get-todays-tasks)))
-      (when todays-tasks
-        (insert "Calendar Tasks:\n")
-        (dolist (task-pair todays-tasks)
-          (let* ((section (car task-pair))
-                 (task (cdr task-pair))
-                 (selected (member task task-manager-selected-tasks)))
-            (insert (format "  [%s] " (if selected "*" " ")))
-            ;; Make task text clickable for editing
-            (insert-text-button task
-                              'face (if selected 'bold 'default)
-                              'follow-link t
-                              'task task
-                              'section section
-                              'action #'task-manager-edit-task-inline
-                              'help-echo "Click to edit task")
-            (insert (format " (in %s)\n" section))))
-        (insert "\n============\n\n")))
-    
-    ;; Display all sections
+    ;; Display ALL sections with tasks
     (dolist (section task-manager-sections)
-      (task-manager-insert-section section))
+      (let ((tasks (gethash section task-manager-tasks))
+            (expanded (gethash section task-manager-expanded-sections)))
+        (insert (propertize (format "%s (%d)" section (length tasks))
+                            'face 'font-lock-keyword-face))
+        (if expanded
+            (insert " [-]\n")
+          (insert " [+]\n"))
+        
+        ;; Show tasks if section is expanded
+        (when expanded
+          (dolist (task tasks)
+            (let ((selected (member task task-manager-selected-tasks))
+                  (display-task (replace-regexp-in-string "^TODAY " "" task)))
+              ;; Make links clickable in display-task
+              (insert (format "  [%s] " (if selected "X" " ")))
+              (insert (task-manager-linkify-text display-task))
+              (insert "\n"))))))
     
-    ;; Display commands
-    (insert "\nCommands:\n")
-    (insert "  a: Add a single task (C-c d during input to insert date)\n")
-    (insert "  A: Add multiple tasks (one per line)\n")
-    (insert "  RET/Click: Edit task under cursor\n")
-    (insert "  SPC: Select/deselect task and move to next\n")
-    (insert "  * s: Select all tasks in current section\n")
-    (insert "  * a: Select all tasks across all sections\n")
-    (insert "  m: Move selected task(s) to another section\n")
-    (insert "  M: Move all tasks from one section to another\n")
-    (insert "  W: Move all tasks from Inbox and Today to Week\n")
-    (insert "  k: Delete selected task(s)\n")
-    (insert "  K: Move all tasks in section to Archive\n")
-    (insert "  x: Move selected task(s) to Archive\n")
-    (insert "  D: Delete ALL tasks from ALL sections (with confirmation)\n")
-    (insert "  n/p: Move to next/previous task\n")
-    (insert "  e: Expand/collapse section\n")
-    (insert "  z: Expand/collapse all sections\n")
-    
-    ;; Restore cursor position
-    (goto-char (point-min))
-    (forward-line (1- current-line))
-    (move-to-column current-column)
-    ;; Center the view on the cursor using the safe function
-    (task-manager-safe-recenter)))
-
-(defun task-manager-insert-section (section)
-  "Insert SECTION and its tasks."
-  (let ((expanded (gethash section task-manager-expanded-sections t))
-        (tasks (gethash section task-manager-tasks)))
-    (insert (format "%s %s\n"
-                    (if expanded "[-]" "[+]")
-                    section))
-    (when expanded
-      (dolist (task tasks)
-        (let ((selected (member task task-manager-selected-tasks)))
-          (insert (format "  [%s] " (if selected "*" " ")))
-          ;; Split task into parts and insert with links
-          (let ((start 0)
-                (button-start (point)))
-            (while (string-match "\\(https?://[^\s\n]+\\)" task start)
-              (let ((link-start (match-beginning 1))
-                    (link-end (match-end 1))
-                    (link (match-string 1 task)))
-                ;; Make text before link clickable for editing
-                (let ((text-before (substring task start link-start)))
-                  (unless (string-empty-p text-before)
-                    (insert-text-button text-before
-                                      'face (if selected 'bold 'default)
-                                      'follow-link t
-                                      'task task
-                                      'section section
-                                      'action #'task-manager-edit-task-inline
-                                      'help-echo "Click to edit task")))
-                ;; Insert clickable link
-                (insert-text-button link
-                                  'face 'link
-                                  'follow-link t
-                                  'action (lambda (_) 
-                                          (browse-url link))
-                                  'help-echo "Click to open link")
-                (setq start link-end)))
-            ;; Make remaining text clickable for editing
-            (let ((remaining-text (substring task start)))
-              (unless (string-empty-p remaining-text)
-                (insert-text-button remaining-text
-                                  'face (if selected 'bold 'default)
-                                  'follow-link t
-                                  'task task
-                                  'section section
-                                  'action #'task-manager-edit-task-inline
-                                  'help-echo "Click to edit task"))))
-          (insert "\n"))))))
-
-(defun task-manager-insert-task-with-links (task)
-  "Insert TASK text with clickable links."
-  (let ((start 0))
-    (while (string-match "\\(https?://[^\s\n]+\\)" task start)
-      (let ((link-start (match-beginning 1))
-            (link-end (match-end 1))
-            (link (match-string 1 task)))
-        ;; Insert text before link
-        (insert (substring task start link-start))
-        ;; Insert clickable link
-        (insert-text-button link
-                           'face 'link
-                           'follow-link t
-                           'action (lambda (_) 
-                                    (browse-url link))
-                           'help-echo "Click to open link")
-        (setq start link-end)))
-    ;; Insert remaining text after last link
-    (insert (substring task start))))
-
-(defun task-manager-create-input-window (prompt initial-text)
-  "Create a centered window for single task input with PROMPT and INITIAL-TEXT."
-  (let* ((buf (get-buffer-create "*Task Input*"))
-         (window-min-height 3)
-         (height 5)
-         (width 80)
-         (frame-height (frame-height))
-         (frame-width (frame-width))
-         (window (display-buffer-in-side-window
-                 buf
-                 `((side . top)
-                   (slot . 0)
-                   (window-height . ,height)
-                   (window-width . ,width)
-                   (preserve-size . (t . t))
-                   (body-function . ,#'(lambda (window)
-                                       (with-selected-window window
-                                         (erase-buffer)
-                                         (insert prompt "\n\n")
-                                         ;; Insert the text and remember cursor position
-                                         (let ((input-pos (point)))
-                                           (insert initial-text)
-                                           (insert "\n\n[RET: save, C-g: cancel]")
-                                           ;; Move cursor to end of input text
-                                           (goto-char input-pos)
-                                           (when initial-text
-                                             (forward-char (length initial-text)))))))))))
-    window))
-
-(defun task-manager-insert-date-from-calendar ()
-  "Insert a date using the calendar."
-  (interactive)
-  (let ((date nil))
-    (calendar)
-    (unwind-protect
+    ;; Display commands if enabled, otherwise show a hint
+    (if task-manager-show-commands
         (progn
-          (calendar-forward-day 0)
-          (message "Use arrow keys to move, RET to select date, q to cancel")
-          (let ((calendar-move-hook nil)
-                (calendar-exit-hook nil))
-            (while (not date)
-              (let ((key (read-key-sequence nil)))
-                (cond
-                 ((equal key "\r")  ; RET
-                  (let* ((calendar-date (calendar-cursor-to-date))
-                         (time (encode-time 0 0 0
-                                          (nth 1 calendar-date)  ; day
-                                          (nth 0 calendar-date)  ; month
-                                          (nth 2 calendar-date)  ; year
-                                          )))
-                    (setq date (format-time-string task-manager-date-format time))))
-                 ((equal key "q")
-                  (setq date 'quit))
-                 ((equal key [left])
-                  (calendar-backward-day 1))
-                 ((equal key [right])
-                  (calendar-forward-day 1))
-                 ((equal key [up])
-                  (calendar-backward-week 1))
-                 ((equal key [down])
-                  (calendar-forward-week 1))
-                 ((equal key [prior])  ; PageUp
-                  (calendar-backward-month 1))
-                 ((equal key [next])   ; PageDown
-                  (calendar-forward-month 1))))))
-          (unless (eq date 'quit)
-            date))
-      (calendar-exit))))
-
-(defun task-manager-read-task-with-date (prompt &optional initial-text)
-  "Read task input with optional date selection using calendar.
-PROMPT is shown to user, INITIAL-TEXT is optional starting text."
-  (let* ((window (task-manager-create-input-window 
-                 (concat prompt "\nPress C-c d to insert date") 
-                 (or initial-text "")))
-         (buffer (window-buffer window))
-         (done nil)
-         result)
-    (with-current-buffer buffer
-      (let ((map (make-sparse-keymap)))
-        ;; Enable basic editing commands
-        (use-local-map (make-composed-keymap map (current-global-map)))
-        
-        (define-key map (kbd "RET")
-                    (lambda ()
-                      (interactive)
-                      (let ((start-pos (save-excursion
-                                       (goto-char (point-min))
-                                       (forward-line 2)
-                                       (point)))
-                            (end-pos (save-excursion
-                                     (goto-char (point-max))
-                                     (search-backward "[RET")
-                                     (beginning-of-line)
-                                     (point))))
-                        (setq result (string-trim
-                                    (buffer-substring-no-properties start-pos end-pos))))
-                      (setq done t)
-                      (exit-recursive-edit)))
-        
-        (define-key map (kbd "C-c d")
-                    (lambda ()
-                      (interactive)
-                      (let ((date (task-manager-insert-date-from-calendar)))
-                        (when date
-                          (insert date " ")))))
-        
-        (define-key map (kbd "C-g")
-                    (lambda ()
-                      (interactive)
-                      (setq done 'quit)
-                      (exit-recursive-edit)))))
+          (insert "\nCommands:\n")
+          (insert "  a: Add a single task\n")
+          (insert "  A: Add multiple tasks\n")
+          (insert "  k: Delete selected tasks (move to Archive)\n")
+          (insert "  K: Delete all tasks in a section\n")
+          (insert "  m: Move selected tasks\n")
+          (insert "  RET: Edit task\n")
+          (insert "  z: Expand/collapse all sections\n")
+          (insert "  S: Search tasks\n")
+          (insert "  s: Focus on Someday section\n")
+          (insert "  r: Set recurring task\n")
+          (insert "  R: Clear recurring status\n")
+          (insert "  V: View all recurring tasks\n")
+          (insert "  F: Focus on Archive section\n")
+          (insert "  p: Move to previous task\n")
+          (insert "  d: Set due date\n")
+          (insert "  D: Clear due date\n")
+          (insert "  T: Add tags\n")
+          (insert "  t: Focus on Today section\n")
+          (insert "  w: Focus on Week section\n")
+          (insert "  W: Move all tasks from Inbox and Today to Week\n")
+          (insert "  o: Focus on Monday section\n")
+          (insert "  c: Focus on Calendar section\n")
+          (insert "  C: Toggle commands visibility\n")
+          (insert "  f: Filter tasks\n")
+          (insert "  X: Set reminders\n")
+          (insert "  b: Bulk edit tasks\n")
+          (insert "  x: Export tasks\n")
+          (insert "  i: Focus on Inbox section\n")
+          (insert "  I: Import tasks\n")
+          (insert "  v: Save tasks\n")
+          (insert "  L: Load tasks\n")
+          (insert "  u: Undo (up to 15 operations)\n"))
+      ;; Show reminder when commands are hidden
+      (insert "\nC to show commands\n"))
     
-    (unwind-protect
-        (progn
-          (select-window window)
-          (message "Type your task. Press C-c d to insert date, RET when done")
-          (while (not done)
-            (condition-case nil
-                (recursive-edit)
-              (quit (setq done 'quit))))
-          (unless (eq done 'quit)
-            result))
-      (when (window-live-p window)
-        (delete-window window))
-      (kill-buffer buffer))))
+    (goto-char (point-min))))
 
-(defun task-manager-preserve-point (func &rest args)
-  "Execute FUNC with ARGS while preserving point position."
-  (let ((line (line-number-at-pos))
-        (column (current-column)))
-    (apply func args)
-    (goto-char (point-min))
-    (forward-line (1- line))
-    (move-to-column column)))
-
-(defun task-manager-cache-task (section task)
-  "Add TASK in SECTION to the task cache."
-  (push (cons section task) task-manager-task-cache))
-
-(defun task-manager-apply-cached-changes ()
-  "Apply cached changes to the current tasks."
-  (dolist (cached-task task-manager-task-cache)
-    (let ((section (car cached-task))
-          (task (cdr cached-task)))
-      (unless (member task (gethash section task-manager-tasks))
-        (push task (gethash section task-manager-tasks)))))
-  (setq task-manager-task-cache nil))
-
+;; Task Functions
 (defun task-manager-add-task (section)
   "Add a task to SECTION."
   (interactive
    (list (completing-read "Section: " task-manager-sections)))
-  (task-manager-preserve-point
-   (lambda (section)
-     (let ((task (string-trim (task-manager-read-task-with-date "Enter task:"))))
-       (unless (string-empty-p task)
-         ;; Add to cache and current tasks
-         (task-manager-cache-task section task)
-         (push task (gethash section task-manager-tasks))
-         (task-manager-save-data)
-         (task-manager-refresh))))
-   section))
+  (let ((task (read-string "Enter new task: ")))
+    (unless (string-empty-p task)
+      (push task (gethash section task-manager-tasks))
+      (task-manager-save-tasks)
+      (task-manager-refresh))))
+
+(defun task-manager-add-multiple-tasks (section)
+  "Add multiple tasks to SECTION."
+  (interactive
+   (list (completing-read "Section: " task-manager-sections)))
+  (let ((tasks (split-string
+                (read-string "Enter tasks (one per line): ")
+                "\n" t)))
+    (dolist (task tasks)
+      (unless (string-empty-p task)
+        (push task (gethash section task-manager-tasks))))
+    (task-manager-save-tasks)
+    (task-manager-refresh)))
 
 (defun task-manager-delete-tasks ()
-  "Delete Archive tasks permanently. Move other tasks to Archive section."
+  "Delete selected tasks permanently."
   (interactive)
-  (when task-manager-selected-tasks
-    (let ((deleted-count 0)
-          (archived-count 0)
-          (current-section (save-excursion
-                             (while (and (not (looking-at "\\[[-+]\\] \\(.+\\)$"))
-                                       (> (point) (point-min)))
-                               (forward-line -1))
-                             (when (looking-at "\\[[-+]\\] \\(.+\\)$")
-                               (match-string 1)))))
-      (dolist (task task-manager-selected-tasks)
-        (dolist (section task-manager-sections)
-          (let ((tasks (gethash section task-manager-tasks)))
-            (when (member task tasks)
-              (setf (gethash section task-manager-tasks)
-                    (remove task tasks))
-              ;; Permanently delete tasks from Archive section
-              ;; Archive tasks from other sections
-              (if (string= section "Archive")
-                  (setq deleted-count (1+ deleted-count))
-                (let ((archived-task (concat task " (from " section ")")))
-                  (push archived-task (gethash "Archive" task-manager-tasks))
-                  (setq archived-count (1+ archived-count))))))))
-      (setq task-manager-selected-tasks nil)
-      (task-manager-save-data)
-      (task-manager-refresh)
-      (message "%d task%s deleted, %d task%s archived"
-               deleted-count (if (= deleted-count 1) "" "s")
-               archived-count (if (= archived-count 1) "" "s")))))
+  (when (and task-manager-selected-tasks
+             (y-or-n-p "Permanently delete selected tasks?"))
+    (dolist (task task-manager-selected-tasks)
+      ;; Find and remove the task from its current section
+      (dolist (section task-manager-sections)
+        (let ((tasks (gethash section task-manager-tasks)))
+          (when (member task tasks)
+            ;; Remove from current section
+            (setf (gethash section task-manager-tasks)
+                  (remove task tasks))))))
+    ;; Clear selected tasks
+    (setq task-manager-selected-tasks nil)
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Tasks permanently deleted.")))
 
-(defun task-manager-permanently-delete-tasks ()
-  "Permanently delete selected tasks from Recycle Bin."
+(defun task-manager-delete-section-tasks ()
+  "Delete all tasks in a chosen section permanently."
   (interactive)
-  (if (not task-manager-selected-tasks)
-      (message "No tasks selected. Select tasks to delete permanently.")
-    (let ((tasks-in-recycle-bin 
-           (cl-intersection task-manager-selected-tasks 
-                           (gethash "Recycle Bin" task-manager-tasks)
-                           :test #'string=)))
-      (if (not tasks-in-recycle-bin)
-          (message "Selected tasks are not in Recycle Bin. Move them there first.")
-        (let ((task-count (length tasks-in-recycle-bin)))
-          (when (yes-or-no-p 
-                 (format "⚠️ PERMANENT DELETION: Delete %d task%s forever? This cannot be undone! "
-                         task-count (if (= task-count 1) "" "s")))
-            (setf (gethash "Recycle Bin" task-manager-tasks)
-                  (cl-remove-if (lambda (task)
-                                 (member task tasks-in-recycle-bin))
-                               (gethash "Recycle Bin" task-manager-tasks)))
-            (setq task-manager-selected-tasks
-                  (cl-remove-if (lambda (task)
-                                 (member task tasks-in-recycle-bin))
-                               task-manager-selected-tasks))
-            (task-manager-save-data)
-            (task-manager-refresh)
-            (message "%d task%s permanently deleted"
-                     task-count (if (= task-count 1) "" "s"))))))))
+  (let* ((section (completing-read "Delete all tasks from section: " 
+                                  task-manager-sections)))
+    (when (and section
+               (y-or-n-p (format "Permanently delete ALL tasks from %s? " section)))
+      ;; Empty the section
+      (puthash section nil task-manager-tasks)
+      ;; Clear any of these tasks from selection
+      (setq task-manager-selected-tasks 
+            (seq-filter (lambda (task)
+                          (not (member task (gethash section task-manager-tasks))))
+                        task-manager-selected-tasks))
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      (message "All tasks from %s permanently deleted." section))))
 
 (defun task-manager-move-tasks ()
   "Move selected tasks to another section."
   (interactive)
-  (when task-manager-selected-tasks
-    (let* ((current-section (save-excursion
-                             (while (and (not (looking-at "\\[[-+]\\] \\(.+\\)$"))
-                                       (> (point) (point-min)))
-                               (forward-line -1))
-                             (when (looking-at "\\[[-+]\\] \\(.+\\)$")
-                               (match-string 1))))
-           (target (completing-read "Move to section: " 
-                                  (remove current-section task-manager-sections))))
-      (dolist (task task-manager-selected-tasks)
-        (dolist (section task-manager-sections)
-          (let ((tasks (gethash section task-manager-tasks)))
-            (when (member task tasks)
-              (setf (gethash section task-manager-tasks)
-                    (remove task tasks))
-              (push task (gethash target task-manager-tasks))))))
-      (setq task-manager-selected-tasks nil)
-      (task-manager-refresh))))
-
-(defun task-manager-move-all-tasks-in-section ()
-  "Move all tasks from one section to another using dialogs."
-  (interactive)
-  (let* ((source-section (completing-read "Move all tasks from section: " 
-                                        task-manager-sections))
-         (target-section (completing-read 
-                         (format "Move all tasks from %s to: " source-section)
-                         (remove source-section task-manager-sections)))
-         (source-tasks (gethash source-section task-manager-tasks)))
-    (when (and source-tasks (not (null source-tasks)))
-      ;; Move all tasks to target section
-      (setf (gethash target-section task-manager-tasks)
-            (append source-tasks (gethash target-section task-manager-tasks)))
-      ;; Clear source section
-      (setf (gethash source-section task-manager-tasks) nil)
-      (task-manager-refresh))))
-
-(defun task-manager-toggle-section ()
-  "Toggle expansion of selected section."
-  (interactive)
-  (let ((section (completing-read "Toggle section: " task-manager-sections)))
-    (let ((current-state (gethash section task-manager-expanded-sections t)))
-      (puthash section (not current-state) task-manager-expanded-sections)
-      (task-manager-refresh))))
-
-(defun task-manager-next-task ()
-  "Move point to the next task line and center the view."
-  (interactive)
-  (let ((orig-pos (point))
-        (found nil))
-    (beginning-of-line)
-    (forward-line)
-    (while (and (not (eobp))
-                (not found))
-      (when (looking-at "^  \\[[ *]\\]")
-        (setq found t))
-      (unless found
-        (forward-line)))
-    (if found
-        (progn
-          (move-to-column 2)
-          (task-manager-safe-recenter)
-          (message "Moved to next task"))
-      (goto-char orig-pos)
-      (message "No next task found"))))
-
-(defun task-manager-previous-task ()
-  "Move point to the previous task line and center the view."
-  (interactive)
-  (let ((orig-pos (point))
-        (found nil))
-    (beginning-of-line)
-    (forward-line -1)
-    (while (and (not (bobp))
-                (not found))
-      (when (looking-at "^  \\[[ *]\\]")
-        (setq found t))
-      (unless found
-        (forward-line -1)))
-    (if found
-        (progn
-          (move-to-column 2)
-          (task-manager-safe-recenter)
-          (message "Moved to previous task"))
-      (goto-char orig-pos)
-      (message "No previous task found"))))
-
-(defun task-manager-toggle-task ()
-  "Toggle selection of task at point and move to next task."
-  (interactive)
-  (let ((was-on-task nil)
-        (task-text nil)
-        (current-point (point))
-        (next-task-pos nil))
-    ;; Check if we're on a task line and get the task text
-    (save-excursion
-      (beginning-of-line)
-      (when (looking-at "^  \\[[ *]\\] \\(.+?\\)\\($\\| (in \\|\n\\)")
-        (setq was-on-task t
-              task-text (match-string-no-properties 1))))
-    
-    (when (and was-on-task task-text)
-      ;; Find the position of the next task before refreshing
-      (save-excursion
-        (forward-line)
-        (while (and (not (eobp))
-                    (not next-task-pos))
-          (if (looking-at "^  \\[[ *]\\]")
-              (setq next-task-pos (point))
-            (forward-line))))
-      
-      ;; Toggle the task selection
-      (let ((task (replace-regexp-in-string " (in [^)]+)$" "" task-text)))
-        (if (member task task-manager-selected-tasks)
-            (setq task-manager-selected-tasks
-                  (remove task task-manager-selected-tasks))
-          (push task task-manager-selected-tasks)))
-      
-      ;; Refresh the display
-      (task-manager-refresh)
-      
-      ;; Move to the next task
-      (if next-task-pos
-          (progn
-            (goto-char next-task-pos)
-            (move-to-column 2)
-            (task-manager-safe-recenter))
-        ;; If no next task in current section, try to find first task in next section
-        (goto-char current-point)
-        (let ((found nil))
-          (while (and (not found)
-                     (not (eobp)))
-            (forward-line)
-            (when (looking-at "^  \\[[ *]\\]")
-              (setq found t)
-              (move-to-column 2)
-              (task-manager-safe-recenter)))
-          (unless found
-            (message "No more tasks")))))))
-
-(defun task-manager-toggle-all-sections ()
-  "Toggle expansion state of all sections."
-  (interactive)
-  (setq task-manager-all-expanded (not task-manager-all-expanded))
-  (dolist (section task-manager-sections)
-    (puthash section task-manager-all-expanded task-manager-expanded-sections))
-  (task-manager-refresh))
-
-(defun task-manager-toggle-edit-mode ()
-  "Toggle edit mode for tasks."
-  (interactive)
-  (setq task-manager-edit-mode (not task-manager-edit-mode))
-  (task-manager-refresh))
-
-(defun task-manager-edit-task ()
-  "Edit the task at point."
-  (interactive)
-  (when task-manager-edit-mode
-    (save-excursion
-      (beginning-of-line)
-      (when (looking-at "  \\[[ *]\\] \\(.+?\\)\\( \\[RET to edit\\]\\)?$")
-        (let* ((old-task (match-string 1))
-               (section (save-excursion
-                         (while (not (looking-at "\\[[-+]\\] \\(.+\\)$"))
-                           (forward-line -1))
-                         (match-string 1)))
-               (new-task (string-trim (task-manager-read-task-with-date "Edit task:" old-task))))
-          (let ((tasks (gethash section task-manager-tasks)))
-            (if (string-empty-p new-task)
-                (setf (gethash section task-manager-tasks)
-                      (remove old-task tasks))
-              (setf (gethash section task-manager-tasks)
-                    (cons new-task (remove old-task tasks))))))
-        (task-manager-save-data)
-        (task-manager-refresh)))))
-
-(defun task-manager-archive-tasks ()
-  "Move selected tasks to the Archive section."
-  (interactive)
-  (when task-manager-selected-tasks
+  (let ((target (completing-read "Move to section: " task-manager-sections)))
     (dolist (task task-manager-selected-tasks)
       (dolist (section task-manager-sections)
         (let ((tasks (gethash section task-manager-tasks)))
           (when (member task tasks)
             (setf (gethash section task-manager-tasks)
                   (remove task tasks))
-            (push task (gethash "Archive" task-manager-tasks))))))
+            (push task (gethash target task-manager-tasks))))))
     (setq task-manager-selected-tasks nil)
-    (message "Tasks archived")
+    (task-manager-save-tasks)
     (task-manager-refresh)))
 
-(defun task-manager-toggle-all-tasks-in-section (section)
-  "Toggle selection of all tasks in SECTION."
-  (interactive
-   (list (completing-read "Toggle all tasks in section: " task-manager-sections)))
-  (let ((tasks (gethash section task-manager-tasks)))
-    (if (cl-every (lambda (task) (member task task-manager-selected-tasks)) tasks)
-        ;; If all tasks are selected, unselect them
-        (setq task-manager-selected-tasks
-              (cl-remove-if (lambda (task) (member task tasks))
-                           task-manager-selected-tasks))
-      ;; Otherwise, select all unselected tasks
-      (dolist (task tasks)
-        (unless (member task task-manager-selected-tasks)
-          (push task task-manager-selected-tasks)))))
-  (task-manager-refresh))
-
-(defun task-manager-toggle-all-tasks ()
-  "Toggle selection of all tasks in all sections."
+(defun task-manager-toggle-all-sections ()
+  "Toggle expansion of all sections."
   (interactive)
-  (let ((all-tasks (cl-loop for section being the hash-keys of task-manager-tasks
-                           append (gethash section task-manager-tasks))))
-    (if (cl-every (lambda (task) (member task task-manager-selected-tasks)) all-tasks)
-        ;; If all tasks are selected, unselect all
-        (setq task-manager-selected-tasks nil)
-      ;; Otherwise, select all tasks
-      (setq task-manager-selected-tasks all-tasks)))
-  (task-manager-refresh))
+  (let ((all-expanded t))
+    ;; Check if all sections are expanded
+    (dolist (section task-manager-sections)
+      (when (not (gethash section task-manager-expanded-sections))
+        (setq all-expanded nil)))
+    
+    ;; Toggle all sections to the opposite state
+    (dolist (section task-manager-sections)
+      (puthash section (not all-expanded) task-manager-expanded-sections))
+    
+    (task-manager-refresh)))
 
-(defun task-manager-delete-all-tasks ()
-  "Delete ALL tasks from ALL sections with extra confirmation."
+(defun task-manager-toggle-task-at-point ()
+  "Toggle selection of task at point and move to next task if possible."
   (interactive)
-  (let ((total-tasks 0)
-        (sections-with-tasks nil))
-    ;; Count total tasks and collect sections with tasks
+  (let ((task-found nil)
+        (current-line (line-number-at-pos))
+        (task-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+    ;; Check if we're on a task line (which may now contain text properties for links)
+    (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*?\\)\\(?: (in \\(.*\\))?\\)?$" task-line)
+      (let ((raw-task (match-string 2 task-line))
+            (is-selected (string= (match-string 1 task-line) "X"))
+            (section-info (match-string 3 task-line))) ; for "Due Today" section
+        
+        ;; Find the original task with metadata
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (dolist (full-task tasks)
+              ;; Remove metadata for plain text comparison
+              (let* ((stripped-task (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" full-task))
+                     (stripped-task (string-trim stripped-task)))
+                (when (or (string-match-p (regexp-quote raw-task) stripped-task)
+                          (string-match-p (regexp-quote stripped-task) raw-task))
+                  (setq task-found full-task)
+                  (if (member full-task task-manager-selected-tasks)
+                      (setq task-manager-selected-tasks 
+                            (remove full-task task-manager-selected-tasks))
+                    (push full-task task-manager-selected-tasks)))))))
+        
+        ;; If it's a "Due Today" task with section info, use that
+        (when (and (not task-found) section-info)
+          (let ((tasks (gethash section-info task-manager-tasks)))
+            (dolist (full-task tasks)
+              (let* ((stripped-task (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" full-task))
+                     (stripped-task (string-trim stripped-task)))
+                (when (or (string-match-p (regexp-quote raw-task) stripped-task)
+                          (string-match-p (regexp-quote stripped-task) raw-task))
+                  (if (member full-task task-manager-selected-tasks)
+                      (setq task-manager-selected-tasks 
+                            (remove full-task task-manager-selected-tasks))
+                    (push full-task task-manager-selected-tasks))
+                  (setq task-found t))))))
+        
+        ;; Refresh and position cursor
+        (when task-found
+          (task-manager-save-tasks)
+          (task-manager-refresh)
+          
+          ;; Try to position at the next task (current line + 1)
+          (goto-char (point-min))
+          (forward-line (1- current-line)) ;; Get back to our line
+          
+          ;; Check if there's a next task line (simple check for "[" on next line)
+          (forward-line 1)
+          (let ((next-line (buffer-substring-no-properties 
+                            (line-beginning-position) 
+                            (min (+ (line-beginning-position) 5) (point-max)))))
+            (unless (string-match-p "\\[" next-line)
+              ;; No next task, go back to current task
+              (forward-line -1)))
+          
+          (beginning-of-line))))
+    
+    (unless task-found
+      (message "No task found at point or unable to toggle selection."))))
+
+;; Persistence Functions
+(defun task-manager-push-to-undo-history ()
+  "Save current task state to undo history."
+  (let ((current-state (make-hash-table :test 'equal)))
+    ;; Deep copy the tasks hash table
     (maphash (lambda (section tasks)
-               (when (> (length tasks) 0)
-                 (push section sections-with-tasks)
-                 (setq total-tasks (+ total-tasks (length tasks)))))
+               (puthash section (copy-sequence tasks) current-state))
              task-manager-tasks)
-    
-    (when (> total-tasks 0)  ; Only proceed if there are tasks to delete
-      ;; First warning
-      (when (yes-or-no-p 
-             (format "Really delete ALL %d tasks from %d sections? This cannot be undone! " 
-                     total-tasks (length sections-with-tasks)))
-        ;; Second warning with typing confirmation
-        (let ((confirm-text (format "delete-%d-tasks" total-tasks)))
-          (when (string= (read-string 
-                         (format "Type '%s' to confirm deletion: " confirm-text))
-                        confirm-text)
-            ;; Final warning with countdown
-            (let ((countdown 10))
-              (while (> countdown 0)
-                (message "Deleting all tasks in %d seconds... Press C-g to cancel" 
-                         countdown)
-                (sit-for 1)
-                (setq countdown (1- countdown)))
-              ;; Perform deletion
-              (dolist (section task-manager-sections)
-                (puthash section nil task-manager-tasks))
-              (setq task-manager-selected-tasks nil)
-              (message "All tasks have been deleted from %d sections" (length sections-with-tasks))
-              (task-manager-refresh))))))))
+    (push current-state task-manager-undo-history)
+    ;; Limit history size
+    (when (> (length task-manager-undo-history) task-manager-undo-history-size)
+      (setq task-manager-undo-history (butlast task-manager-undo-history)))))
 
-(defun task-manager-create-multi-input-window (prompt)
-  "Create a centered window for multiple task input with PROMPT."
-  (let* ((buf (get-buffer-create "*Task Input*"))
-         (window-min-height 3)
-         (height 15)
-         (width 80)
-         (frame-height (frame-height))
-         (frame-width (frame-width))
-         (window (display-buffer-in-side-window
-                 buf
-                 `((side . top)
-                   (slot . 0)
-                   (window-height . ,height)
-                   (window-width . ,width)
-                   (preserve-size . (t . t))
-                   (body-function . ,#'(lambda (window)
-                                       (with-selected-window window
-                                         (erase-buffer)
-                                         (insert prompt "\n\n")
-                                         (insert "\n\n[C-c C-c: save, C-g: cancel, C-c d: insert date]")
-                                         ;; Move cursor to input position
-                                         (goto-char (point-min))
-                                         (forward-line 2))))))))
-    window))
+(defun task-manager-undo ()
+  "Undo the last operation in task manager."
+  (interactive)
+  (if (null task-manager-undo-history)
+      (message "Nothing to undo")
+    (let ((previous-state (pop task-manager-undo-history)))
+      ;; Create a fresh hash table
+      (setq task-manager-tasks (make-hash-table :test 'equal))
+      ;; Copy contents from previous state to current state
+      (maphash (lambda (section tasks)
+                 (puthash section (copy-sequence tasks) task-manager-tasks))
+               previous-state)
+      (task-manager-refresh)
+      (message "Undid last operation"))))
 
-(defun task-manager-read-multiple-tasks (prompt)
-  "Read multiple tasks, one per line, in a centered window with PROMPT."
-  (let* ((window (task-manager-create-multi-input-window prompt))
-         (buffer (window-buffer window))
-         (done nil)
-         result)
-    (with-current-buffer buffer
-      (let ((map (make-sparse-keymap)))
-        (define-key map (kbd "C-c C-c")
-                    (lambda ()
-                      (interactive)
-                      (let ((start-pos (save-excursion
-                                       (goto-char (point-min))
-                                       (forward-line 2)
-                                       (point)))
-                            (end-pos (save-excursion
-                                     (goto-char (point-max))
-                                     (search-backward "[C-c")
-                                     (beginning-of-line)
-                                     (point))))
-                        (setq result
-                              (split-string
-                               (string-trim (buffer-substring-no-properties start-pos end-pos))
-                               "\n" t "[ \t\n\r]+")))
-                      (setq done t)
-                      (exit-recursive-edit)))
-        
-        (define-key map (kbd "C-c d")
-                    (lambda ()
-                      (interactive)
-                      (let ((date (task-manager-insert-date-from-calendar)))
-                        (when date
-                          (insert date " ")))))
-        
-        (define-key map (kbd "RET") 'newline)  ; Allow normal newlines
-        (define-key map (kbd "C-g")
-                    (lambda ()
-                      (interactive)
-                      (setq done 'quit)
-                      (exit-recursive-edit)))
-        (use-local-map map)))
+(defun task-manager-save-tasks ()
+  "Save tasks to the save file, preserving beorg formatting."
+  (interactive)
+  ;; Only push to history when saving as a result of a change, not on startup
+  (when (called-interactively-p 'any)
+    (task-manager-push-to-undo-history))
+  
+  ;; Read existing file to preserve structure and format
+  (let ((existing-content "")
+        (section-map '(("Inbox" . "Inbox")
+                       ("Today" . "Next Actions")
+                       ("Week" . "Projects")
+                       ("Monday" . "Monday")
+                       ("Calendar" . "Calendar")
+                       ("Someday" . "Someday")
+                       ("Archive" . "Archive"))))
     
-    (unwind-protect
+    ;; Try to read existing content to preserve formatting
+    (when (file-exists-p task-manager-save-file)
+      (setq existing-content (with-temp-buffer
+                               (insert-file-contents task-manager-save-file)
+                               (buffer-string))))
+    
+    ;; Create new content
+    (with-temp-buffer
+      ;; If there's no existing content, add standard header
+      (if (string-empty-p existing-content)
+          (insert "#+TITLE: beorg Tasks\n\n")
+        ;; Otherwise preserve header until first heading
+        (string-match "^\\* " existing-content)
+        (let ((header (substring existing-content 0 (match-beginning 0))))
+          (insert header)))
+      
+      ;; Write sections and tasks
+      (dolist (section-pair section-map)
+        (let* ((our-section (car section-pair))
+               (beorg-section (cdr section-pair))
+               (tasks (gethash our-section task-manager-tasks)))
+          (when tasks
+            (insert (format "* %s\n" beorg-section))
+            (dolist (task (reverse tasks)) ;; reverse to maintain order
+              (insert (format "** %s\n" task))))))
+      
+      ;; Write to file
+      (write-region (point-min) (point-max) task-manager-save-file))
+    
+    (message "Tasks saved to %s" task-manager-save-file)))
+
+(defun task-manager-load-tasks ()
+  "Load tasks from the save file."
+  (interactive)
+  (when (file-exists-p task-manager-save-file)
+    ;; Reset the tasks hash table
+    (setq task-manager-tasks (make-hash-table :test 'equal))
+    (dolist (section task-manager-sections)
+      (puthash section '() task-manager-tasks))
+    
+    ;; Parse the file
+    (with-temp-buffer
+      (insert-file-contents task-manager-save-file)
+      (org-mode)
+      (goto-char (point-min))
+      (let ((current-section nil))
+        (while (not (eobp))
+          (cond
+           ;; Section header (level 1 heading)
+           ((looking-at "^\\* \\(.+\\)")
+            (let ((heading (match-string 1)))
+              ;; Map beorg headings to our sections
+              (cond
+               ((string-match-p "Inbox" heading)
+                (setq current-section "Inbox"))
+               ((string-match-p "Next Actions" heading)
+                (setq current-section "Today"))
+               ((string-match-p "Projects" heading)
+                (setq current-section "Week"))
+               ((string-match-p "Someday" heading)
+                (setq current-section "Someday"))
+               ((string-match-p "Archive" heading)
+                (setq current-section "Archive"))
+               ((string-match-p "Monday" heading)
+                (setq current-section "Monday"))
+               ((string-match-p "Calendar" heading)
+                (setq current-section "Calendar"))
+               (t (setq current-section "Inbox")))))
+           
+           ;; Task entry (level 2 heading)
+           ((and current-section (looking-at "^\\*\\* \\(.+\\)"))
+            (let ((task (match-string 1)))
+              (push task (gethash current-section task-manager-tasks))))
+           
+           ;; Task entry with deeper level (levels 3+)
+           ((and current-section (looking-at "^\\*\\*\\* \\(.+\\)"))
+            (let ((task (match-string 1)))
+              (push task (gethash current-section task-manager-tasks)))))
+          
+          (forward-line 1))))
+    
+    (message "Tasks loaded from %s" task-manager-save-file)
+    (when (called-interactively-p 'any)
+      (task-manager-refresh))))
+
+;; New Functions
+
+(defun task-manager-search-tasks ()
+  "Search for tasks across all sections."
+  (interactive)
+  (let ((search-term (read-string "Search for: "))
+        (results-buffer (get-buffer-create "*Task Search Results*")))
+    (with-current-buffer results-buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (format "Search results for \"%s\":\n\n" search-term))
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks))
+                (found nil))
+            (dolist (task tasks)
+              (when (string-match-p search-term task)
+                (setq found t)
+                (let ((display-task (replace-regexp-in-string "^TODAY " "" task)))
+                  ;; Insert clickable task result
+                  (insert "  ")
+                  (insert-text-button
+                   (format "%s: %s" section display-task)
+                   'action (lambda (_)
+                            (task-manager-goto-task section task))
+                   'follow-link t
+                   'help-echo "Click to go to this task")
+                  (insert "\n"))))
+            (when found
+              (insert "\n"))))
+        (goto-char (point-min)))
+      (special-mode)
+      ;; Add key to go back to task manager
+      (local-set-key (kbd "q") 'kill-this-buffer))
+    (switch-to-buffer results-buffer)))
+
+(defun task-manager-goto-task (section task)
+  "Jump to TASK in SECTION."
+  (let ((buffer (get-buffer "*Task Manager*")))
+    (when buffer
+      (switch-to-buffer buffer)
+      ;; Make sure the section is expanded
+      (puthash section t task-manager-expanded-sections)
+      (task-manager-refresh)
+      
+      ;; Find and position at the task
+      (goto-char (point-min))
+      (search-forward section nil t)
+      (let ((found nil))
+        (while (and (not found) (not (eobp)))
+          (forward-line)
+          (when (and (not (eolp))
+                     (string-match-p (regexp-quote task) (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+            (setq found t)
+            (beginning-of-line)
+            (recenter)))
+        (when found
+          (message "Found task in %s" section))))))
+
+(defun task-manager-set-recurring ()
+  "Set a task to be recurring. If cursor is on a task, use that task.
+Selecting 'None' will clear recurring status."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to set as recurring: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         ;; Add None as first option to allow clearing recurring status
+         (frequency (completing-read "Frequency: " 
+                                    '("None" "daily" "weekly" "monthly")))
+         ;; Remove any existing recurring tag
+         (task-without-recurring (replace-regexp-in-string "\\[Recurring: [^]]*\\]" "" task))
+         (task-without-recurring (string-trim task-without-recurring))
+         (new-task (if (string= frequency "None")
+                       task-without-recurring
+                     (format "%s [Recurring: %s]" task-without-recurring frequency))))
+    
+    ;; Replace old task with new one that includes recurring info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (if (string= frequency "None")
+        (message "Recurring status cleared.")
+      (message "Task set as recurring %s." frequency))))
+
+(defun task-manager-set-priority ()
+  "Set priority for a task. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to set priority: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         (priority (completing-read "Set priority (high, medium, low): " 
+                                   '("high" "medium" "low")))
+         ;; Remove any existing priority tag
+         (task-without-priority (replace-regexp-in-string "\\[Priority: [^]]*\\]" "" task))
+         (task-without-priority (string-trim task-without-priority))
+         (new-task (format "%s [Priority: %s]" task-without-priority priority)))
+    
+    ;; Replace old task with new one that includes priority info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Priority for task set to %s." priority)))
+
+(defun task-manager-set-due-date ()
+  "Set or clear a due date for a task. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to set due date: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         (has-due-date (and task (string-match "\\[Due: \\([^]]+\\)\\]" task)))
+         (options '("Set date" "Clear date"))
+         (action (completing-read "Action: " options nil t))
+         (new-task nil))
+    
+    (if (string= action "Clear date")
         (progn
-          (select-window window)
-          (message "Enter tasks (one per line). Press C-c d to insert date, C-c C-c when done")
-          (while (not done)
-            (condition-case nil
-                (recursive-edit)
-              (quit (setq done 'quit))))
-          (unless (eq done 'quit)
-            result))
-      (when (window-live-p window)
-        (delete-window window))
-      (kill-buffer buffer))))
-
-(defun task-manager-add-multiple-tasks (section)
-  "Add multiple tasks to SECTION, with support for date insertion."
-  (interactive
-   (list (completing-read "Section: " task-manager-sections)))
-  (let ((tasks (task-manager-read-multiple-tasks 
-                "Enter tasks (one per line)\nUse C-c d to insert date at cursor position")))
-    (when tasks  ; Only proceed if we got tasks (not cancelled)
-      (dolist (task tasks)
-        (unless (string-empty-p task)
-          (push task (gethash section task-manager-tasks))))
-      (task-manager-save-data)
-      (task-manager-refresh)
-      (message "%d tasks added to %s" (length tasks) section))))
-
-(defun task-manager-empty-recycle-bin ()
-  "Delete all tasks from the Recycle Bin."
-  (interactive)
-  (let ((recycle-bin-tasks (gethash "Recycle Bin" task-manager-tasks)))
-    (when (and recycle-bin-tasks
-               (yes-or-no-p (format "Permanently delete all %d tasks in Recycle Bin? This cannot be undone! "
-                                   (length recycle-bin-tasks))))
-      (setf (gethash "Recycle Bin" task-manager-tasks) nil)
-      (task-manager-save-data)
-      (task-manager-refresh)
-      (message "Recycle Bin emptied"))))
-
-(defun task-manager-delete-all-tasks-in-section ()
-  "Move all tasks in a section to Archive."
-  (interactive)
-  (let* ((section (completing-read "Move all tasks from section: " task-manager-sections))
-         (tasks (gethash section task-manager-tasks)))
-         (archived-count 0))
-    (when (and tasks
-               (yes-or-no-p (format "Move all %d tasks from %s to Archive? " 
-                                   (length tasks) section)))
-      ;; Move tasks to Archive with source section info
-      (unless (string= section "Archive")
-        (dolist (task tasks)
-          (let ((archived-task (concat task " (from " section ")")))
-            (push archived-task (gethash "Archive" task-manager-tasks))
-            (setq archived-count (1+ archived-count))))
-      (setf (gethash section task-manager-tasks) nil)
-      (task-manager-save-data)
-      (task-manager-refresh)
-      (message "All tasks from %s moved to Archive" section))))
-
-(defun task-manager-edit-task-inline (button)
-  "Edit task inline when button is clicked."
-  (let* ((old-task (button-get button 'task))
-         (section (button-get button 'section)))
+          ;; Remove any existing due date tag
+          (setq new-task (replace-regexp-in-string "\\[Due: [^]]*\\]" "" task))
+          (setq new-task (string-trim new-task)))
+      ;; Set a new due date
+      (let* ((date (calendar-read-date))
+             (due-date (format "%04d-%02d-%02d" 
+                             (nth 2 date)   ; year
+                             (nth 0 date)   ; month
+                             (nth 1 date))) ; day
+             ;; Remove any existing due date tag
+             (task-without-due (replace-regexp-in-string "\\[Due: [^]]*\\]" "" task))
+             (task-without-due (string-trim task-without-due)))
+        (setq new-task (format "%s [Due: %s]" task-without-due due-date))))
     
-    ;; Use the proven task-manager-read-task-with-date function
-    (let ((new-task (task-manager-read-task-with-date "Edit task:" old-task)))
-      (when (and new-task (not (string-empty-p new-task)))
-        ;; Remove old task
-        (let ((tasks (gethash section task-manager-tasks)))
-          (setf (gethash section task-manager-tasks)
-                (remove old-task tasks)))
+    ;; Replace old task with new one
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (if (string= action "Clear date")
+        (message "Due date cleared.")
+      (message "Due date set."))))
+
+(defun task-manager-clear-due-date ()
+  "Clear the due date from a task at point."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to clear due date: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         ;; Remove any existing due date tag
+         (new-task (replace-regexp-in-string "\\[Due: [^]]*\\]" "" task))
+         (new-task (string-trim new-task)))
+    
+    ;; Replace old task with new one
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Due date cleared.")))
+
+(defun task-manager-add-tags ()
+  "Add tags to a task. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to tag: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         (existing-tags (and (string-match "\\[Tags: \\([^]]+\\)\\]" task)
+                            (match-string 1 task)))
+         (tags-prompt (if existing-tags
+                         (format "Enter tags (currently: %s): " existing-tags)
+                       "Enter tags (comma separated): "))
+         (tags (read-string tags-prompt))
+         ;; Remove any existing tags
+         (task-without-tags (replace-regexp-in-string "\\[Tags: [^]]*\\]" "" task))
+         (task-without-tags (string-trim task-without-tags))
+         (new-task (format "%s [Tags: %s]" task-without-tags tags)))
+    
+    ;; Replace old task with new one that includes tags info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Tags for task set to %s." tags)))
+
+(defun task-manager-setting-reminders ()
+  "Set reminders for tasks. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to set reminder: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         (existing-reminder (and (string-match "\\[Reminder: \\([^]]+\\)\\]" task)
+                               (match-string 1 task)))
+         (reminder-prompt (if existing-reminder
+                             (format "Enter reminder time (currently: %s): " existing-reminder)
+                           "Enter reminder time (YYYY-MM-DD HH:MM): "))
+         (reminder-time (read-string reminder-prompt))
+         ;; Remove any existing reminder tag
+         (task-without-reminder (replace-regexp-in-string "\\[Reminder: [^]]*\\]" "" task))
+         (task-without-reminder (string-trim task-without-reminder))
+         (new-task (format "%s [Reminder: %s]" task-without-reminder reminder-time)))
+    
+    ;; Replace old task with new one that includes reminder info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Reminder for task set at %s." reminder-time)))
+
+(defun task-manager-filter-tasks ()
+  "Filter tasks by priority, due date, or tags."
+  (interactive)
+  (let* ((filter-type (completing-read "Filter by: " '("priority" "due date" "tags")))
+         (filter-value (cond
+                        ;; Use calendar for due date selection
+                        ((string= filter-type "due date")
+                         (let ((date (calendar-read-date)))
+                           (format "%04d-%02d-%02d" 
+                                   (nth 2 date)   ; year
+                                   (nth 0 date)   ; month
+                                   (nth 1 date)))) ; day
+                        ;; Use regular read-string for other types
+                        (t (read-string (format "Enter %s to filter by: " filter-type)))))
+         (results-buffer (get-buffer-create "*Task Filter Results*")))
+    (with-current-buffer results-buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (format "Tasks filtered by %s = \"%s\":\n\n" filter-type filter-value))
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks))
+                (found nil))
+            (dolist (task tasks)
+              (let ((pattern (format "\\[%s: [^]]*%s[^]]*\\]" 
+                                     (cond
+                                      ((string= filter-type "priority") "Priority")
+                                      ((string= filter-type "due date") "Due")
+                                      ((string= filter-type "tags") "Tags"))
+                                     (regexp-quote filter-value))))
+                (when (string-match-p pattern task)
+                  (setq found t)
+                  (let ((display-task (replace-regexp-in-string "^TODAY " "" task)))
+                    ;; Insert clickable task result
+                    (insert "  ")
+                    (insert-text-button
+                     (format "%s: %s" section display-task)
+                     'action (lambda (_)
+                              (task-manager-goto-task section task))
+                     'follow-link t
+                     'help-echo "Click to go to this task")
+                    (insert "\n")))))
+            (when found
+              (insert "\n"))))
+        (goto-char (point-min)))
+      (special-mode)
+      ;; Add key to go back to task manager
+      (local-set-key (kbd "q") 'kill-this-buffer))
+    (switch-to-buffer results-buffer)))
+
+(defun task-manager-bulk-edit ()
+  "Perform bulk edits on selected tasks."
+  (interactive)
+  (when task-manager-selected-tasks
+    (let* ((action (completing-read "Bulk action: " 
+                                    '("add tag" "set priority" "set due date" 
+                                      "set reminder" "mark as recurring")))
+           (value (read-string (format "Enter %s value: " action))))
+      (dolist (task task-manager-selected-tasks)
+        (let ((new-task (format "%s [%s: %s]" task
+                                (cond
+                                 ((string= action "add tag") "Tags")
+                                 ((string= action "set priority") "Priority")
+                                 ((string= action "set due date") "Due")
+                                 ((string= action "set reminder") "Reminder")
+                                 ((string= action "mark as recurring") "Recurring"))
+                                value)))
+          ;; Replace old task with new one that includes the new info
+          (dolist (section task-manager-sections)
+            (let ((tasks (gethash section task-manager-tasks)))
+              (when (member task tasks)
+                (setf (gethash section task-manager-tasks)
+                      (mapcar (lambda (t)
+                                (if (string= t task) new-task t))
+                              tasks)))))))
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      (message "Bulk edited %d tasks." (length task-manager-selected-tasks)))))
+
+(defun task-manager-export ()
+  "Export tasks to a file."
+  (interactive)
+  (let* ((format (completing-read "Export format: " '("org" "json" "csv")))
+         (file (read-file-name (format "Export to %s file: " format))))
+    (with-temp-buffer
+      (cond
+       ((string= format "org")
+        (insert "#+TITLE: Task Manager Export\n\n")
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (insert (format "* %s\n" section))
+            (dolist (task tasks)
+              (insert (format "** %s\n" task))))))
+       
+       ((string= format "json")
+        (let ((json-object '()))
+          (dolist (section task-manager-sections)
+            (let ((tasks (gethash section task-manager-tasks)))
+              (push (cons section tasks) json-object)))
+          (insert (json-encode json-object))))
+       
+       ((string= format "csv")
+        (insert "Section,Task\n")
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (dolist (task tasks)
+              (insert (format "%s,%s\n" 
+                              (replace-regexp-in-string "," "\\," section)
+                              (replace-regexp-in-string "," "\\," task))))))))
+      
+      (write-region (point-min) (point-max) file))
+    (message "Tasks exported to %s" file)))
+
+(defun task-manager-import ()
+  "Import tasks from a file."
+  (interactive)
+  (let* ((format (completing-read "Import format: " '("org" "json" "csv" "plain")))
+         (file (read-file-name (format "Import from %s file: " format))))
+    (when (file-exists-p file)
+      (with-temp-buffer
+        (insert-file-contents file)
+        (cond
+         ;; Import org file content as plain tasks to Inbox
+         ((string= format "org")
+          (goto-char (point-min))
+          (while (not (eobp))
+            (let ((line (buffer-substring-no-properties 
+                         (line-beginning-position) (line-end-position))))
+              ;; Skip empty lines and org properties
+              (when (and (not (string-empty-p line))
+                         (not (string-prefix-p "#+" line))
+                         (not (string-prefix-p ":" line)))
+                ;; Remove org markers like *, **, etc.
+                (setq line (replace-regexp-in-string "^\\*+ " "" line))
+                ;; Add each line as a task to Inbox
+                (push line (gethash "Inbox" task-manager-tasks))))
+            (forward-line 1)))
+         
+         ((string= format "json")
+          (let ((json-object (json-read)))
+            (dolist (section-pair json-object)
+              (let ((section (car section-pair))
+                    (tasks (cdr section-pair)))
+                (dolist (task tasks)
+                  (push task (gethash section task-manager-tasks)))))))
+         
+         ((string= format "csv")
+          (goto-char (point-min))
+          (forward-line 1) ;; Skip header
+          (while (not (eobp))
+            (when (looking-at "\\([^,]+\\),\\(.+\\)")
+              (let ((section (match-string 1))
+                    (task (match-string 2)))
+                (push task (gethash section task-manager-tasks))))
+            (forward-line 1)))
+         
+         ;; Plain text - each line is a task in Inbox
+         ((string= format "plain")
+          (goto-char (point-min))
+          (while (not (eobp))
+            (let ((line (buffer-substring-no-properties 
+                         (line-beginning-position) (line-end-position))))
+              (unless (string-empty-p line)
+                (push line (gethash "Inbox" task-manager-tasks))))
+            (forward-line 1)))))
+      
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      (message "Tasks imported from %s" file))))
+
+(defun task-manager-focus-inbox ()
+  "Focus on the Inbox section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Inbox is expanded
+  (puthash "Inbox" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Inbox")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Inbox section and first task
+  (goto-char (point-min))
+  (search-forward "Inbox" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Inbox section"))
+
+(defun task-manager-focus-today ()
+  "Focus on the Today section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Today is expanded
+  (puthash "Today" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Today")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Today section and first task
+  (goto-char (point-min))
+  (search-forward "Today" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Today section"))
+
+(defun task-manager-focus-someday ()
+  "Focus on the Someday section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Someday is expanded
+  (puthash "Someday" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Someday")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Someday section and first task
+  (goto-char (point-min))
+  (search-forward "Someday" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Someday section"))
+
+(defun task-manager-focus-week ()
+  "Focus on the Week section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Week is expanded
+  (puthash "Week" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Week")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Week section and first task
+  (goto-char (point-min))
+  (search-forward "Week" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Week section"))
+
+(defun task-manager-focus-monday ()
+  "Focus on the Monday section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Monday is expanded
+  (puthash "Monday" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Monday")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Monday section and first task
+  (goto-char (point-min))
+  (search-forward "Monday" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Monday section"))
+
+(defun task-manager-focus-calendar ()
+  "Focus on the Calendar section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Calendar is expanded
+  (puthash "Calendar" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Calendar")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Calendar section and first task
+  (goto-char (point-min))
+  (search-forward "Calendar" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Calendar section"))
+
+(defun task-manager-focus-archive ()
+  "Focus on the Archive section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Archive is expanded
+  (puthash "Archive" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Archive")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Archive section and first task
+  (goto-char (point-min))
+  (search-forward "Archive" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Archive section"))
+
+(defun task-manager-view-recurring ()
+  "View all recurring tasks across all sections."
+  (interactive)
+  (let ((results-buffer (get-buffer-create "*Recurring Tasks*")))
+    (with-current-buffer results-buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert "All Recurring Tasks:\n\n")
+        (let ((found-any nil))
+          (dolist (section task-manager-sections)
+            (let ((tasks (gethash section task-manager-tasks))
+                  (found nil))
+              (dolist (task tasks)
+                (when (string-match-p "\\[Recurring:" task)
+                  (setq found t)
+                  (setq found-any t)
+                  (let ((display-task (replace-regexp-in-string "^TODAY " "" task))
+                        (frequency (if (string-match "\\[Recurring: \\([^]]+\\)\\]" task)
+                                      (match-string 1 task)
+                                    "unknown")))
+                    ;; Insert clickable task
+                    (insert "  ")
+                    (insert-text-button
+                     (format "%s: %s" section display-task)
+                     'action (lambda (_)
+                              (task-manager-goto-task section task))
+                     'follow-link t
+                     'help-echo "Click to go to this task")
+                    (insert "\n"))))
+              (when found
+                (insert "\n"))))
+          
+          (unless found-any
+            (insert "  No recurring tasks found.\n")))
         
-        ;; Add new task
-        (push new-task (gethash section task-manager-tasks))
+        (goto-char (point-min)))
+      (special-mode)
+      ;; Add key to go back to task manager
+      (local-set-key (kbd "q") 'kill-this-buffer))
+    (switch-to-buffer results-buffer)
+    (message "Viewing all recurring tasks.")))
+
+(defun task-manager-edit-task-at-point ()
+  "Edit the task at point."
+  (interactive)
+  (let ((task-found nil)
+        (current-line (line-number-at-pos))
+        (task-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+    
+    ;; Check if we're on a task line
+    (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)$" task-line)
+      (let ((task-text (match-string 2 task-line))
+            (section nil)
+            (original-task nil))
         
-        ;; Update selected tasks if needed
-        (when (member old-task task-manager-selected-tasks)
-          (setq task-manager-selected-tasks
-                (cons new-task (remove old-task task-manager-selected-tasks))))
+        ;; Find the section and original task
+        (dolist (sec task-manager-sections)
+          (let ((tasks (gethash sec task-manager-tasks)))
+            (dolist (full-task tasks)
+              (when (string-match-p (regexp-quote task-text) full-task)
+                (setq section sec)
+                (setq original-task full-task)
+                (setq task-found t)))))
         
-        ;; Save and refresh
-        (task-manager-save-data)
-        (task-manager-refresh)
-        ;; Center the view safely
-        (task-manager-safe-recenter)
-        (message "Task updated: %s" new-task)))))
+        ;; Also check for "Due Today" tasks with section info in parenthesis
+        (unless task-found
+          (when (string-match "\\[\\([X ]\\)\\] \\(.*\\) (in \\(.*\\))" task-line)
+            (setq task-text (match-string 2 task-line))
+            (setq section (match-string 3 task-line))
+            
+            (let ((tasks (gethash section task-manager-tasks)))
+              (dolist (full-task tasks)
+                (when (string-match-p (regexp-quote task-text) full-task)
+                  (setq original-task full-task)
+                  (setq task-found t))))))
+        
+        (when task-found
+          ;; Extract metadata from original task for preserving
+          (let ((due-date (and (string-match "\\[Due: \\([^]]+\\)\\]" original-task)
+                              (match-string 1 original-task)))
+                (priority (and (string-match "\\[Priority: \\([^]]+\\)\\]" original-task)
+                              (match-string 1 original-task)))
+                (recurring (and (string-match "\\[Recurring: \\([^]]+\\)\\]" original-task)
+                               (match-string 1 original-task)))
+                (tags (and (string-match "\\[Tags: \\([^]]+\\)\\]" original-task)
+                          (match-string 1 original-task)))
+                (reminder (and (string-match "\\[Reminder: \\([^]]+\\)\\]" original-task)
+                              (match-string 1 original-task))))
+            
+            ;; Get the base task text without any metadata
+            (let* ((base-task (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" original-task))
+                   (base-task (string-trim base-task)))
+              
+              ;; Prompt for new task text
+              (let ((new-base-task (read-string "Edit task: " base-task)))
+                
+                ;; Reconstruct the task with its metadata
+                (let ((new-task new-base-task))
+                  (when due-date
+                    (setq new-task (format "%s [Due: %s]" new-task due-date)))
+                  (when priority
+                    (setq new-task (format "%s [Priority: %s]" new-task priority)))
+                  (when recurring
+                    (setq new-task (format "%s [Recurring: %s]" new-task recurring)))
+                  (when tags
+                    (setq new-task (format "%s [Tags: %s]" new-task tags)))
+                  (when reminder
+                    (setq new-task (format "%s [Reminder: %s]" new-task reminder)))
+                  
+                  ;; Replace the old task with the new one
+                  (setf (gethash section task-manager-tasks)
+                        (mapcar (lambda (t)
+                                  (if (string= t original-task) new-task t))
+                                (gethash section task-manager-tasks)))
+                  
+                  ;; Also update in selected tasks if it was selected
+                  (when (member original-task task-manager-selected-tasks)
+                    (setq task-manager-selected-tasks
+                          (mapcar (lambda (t)
+                                    (if (string= t original-task) new-task t))
+                                  task-manager-selected-tasks)))
+                  
+                  (task-manager-save-tasks)
+                  (task-manager-refresh)
+                  
+                  ;; Try to position at the same task line
+                  (goto-char (point-min))
+                  (forward-line (1- current-line))
+                  (beginning-of-line))))))))))
+
+(defun task-manager-previous-task ()
+  "Move to the previous task in the buffer."
+  (interactive)
+  (let ((current-pos (point))
+        (found nil))
+    ;; Move up one line to start searching from the line above current position
+    (forward-line -1)
+    ;; Search backward for a task line (which will have a checkbox)
+    (while (and (not found) (not (bobp)))
+      (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+        (if (string-match-p "^\\s-*\\[\\([X ]\\)\\]" line)
+            (setq found t)
+          (forward-line -1))))
+    
+    ;; If no task found above, go back to original position
+    (unless found
+      (goto-char current-pos)
+      (message "No previous task found"))
+    
+    ;; If found, position cursor at beginning of line
+    (when found
+      (beginning-of-line))))
 
 (defun task-manager-move-to-week ()
   "Move all tasks from Inbox and Today sections to Week section."
   (interactive)
   (let ((inbox-tasks (gethash "Inbox" task-manager-tasks))
         (today-tasks (gethash "Today" task-manager-tasks))
-        (moved-count 0))
-    ;; Move tasks from Inbox
-    (when inbox-tasks
-      (setq moved-count (+ moved-count (length inbox-tasks)))
-      (setf (gethash "Week" task-manager-tasks)
-            (append inbox-tasks (gethash "Week" task-manager-tasks)))
-      (setf (gethash "Inbox" task-manager-tasks) nil))
+        (week-tasks (gethash "Week" task-manager-tasks))
+        (count 0))
     
-    ;; Move tasks from Today
-    (when today-tasks
-      (setq moved-count (+ moved-count (length today-tasks)))
-      (setf (gethash "Week" task-manager-tasks)
-            (append today-tasks (gethash "Week" task-manager-tasks)))
-      (setf (gethash "Today" task-manager-tasks) nil))
+    ;; Add all Inbox tasks to Week
+    (dolist (task inbox-tasks)
+      (push task week-tasks)
+      (setq count (1+ count)))
     
-    ;; Save changes and refresh
-    (task-manager-save-data)
+    ;; Add all Today tasks to Week
+    (dolist (task today-tasks)
+      (push task week-tasks)
+      (setq count (1+ count)))
+    
+    ;; Update the section hash tables
+    (puthash "Week" week-tasks task-manager-tasks)
+    (puthash "Inbox" nil task-manager-tasks)
+    (puthash "Today" nil task-manager-tasks)
+    
+    ;; Remove any of these tasks from selection if they were selected
+    (setq task-manager-selected-tasks 
+          (seq-filter (lambda (task)
+                        (not (or (member task inbox-tasks)
+                                (member task today-tasks))))
+                      task-manager-selected-tasks))
+    
+    (task-manager-save-tasks)
     (task-manager-refresh)
-    (message "%d task%s moved to Week"
-             moved-count (if (= moved-count 1) "" "s"))))
+    
+    ;; Focus on Week section
+    (puthash "Week" t task-manager-expanded-sections)
+    (goto-char (point-min))
+    (search-forward "Week" nil t)
+    (forward-line 1)
+    
+    (message "Moved %d tasks from Inbox and Today to Week." count)))
 
-(defun task-manager-collapse-except (target-section)
-  "Collapse all sections except TARGET-SECTION."
-  (dolist (section task-manager-sections)
-    (puthash section (string= section target-section) task-manager-expanded-sections)))
+(provide 'task-manager2)
 
-(defun task-manager-focus-inbox ()
-  "Focus on the Inbox section and collapse others."
-  (interactive)
-  (goto-char (point-min))
-  (if (search-forward "[" nil t)
-      (progn
-        ;; Collapse all sections except Inbox
-        (task-manager-collapse-except "Inbox")
-        ;; Refresh to ensure expansion state is applied
-        (task-manager-refresh)
-        ;; Find and move to the Inbox section
-        (goto-char (point-min))
-        (if (search-forward "[-] Inbox" nil t)
-            (progn
-              (forward-line 1)
-              (task-manager-safe-recenter)
-              (message "Focused on Inbox"))
-          (message "Inbox section not found")))
-    (message "Could not locate sections")))
+;;; task-manager2.el ends here
 
-(defun task-manager-focus-today ()
-  "Focus on the Today section and collapse others."
-  (interactive)
-  (goto-char (point-min))
-  (if (search-forward "[" nil t)
-      (progn
-        ;; Collapse all sections except Today
-        (task-manager-collapse-except "Today")
-        ;; Refresh to ensure expansion state is applied
-        (task-manager-refresh)
-        ;; Find and move to the Today section
-        (goto-char (point-min))
-        (if (search-forward "[-] Today" nil t)
-            (progn
-              (forward-line 1)
-              (task-manager-safe-recenter)
-              (message "Focused on Today"))
-          (message "Today section not found")))
-    (message "Could not locate sections")))
-
-(defun task-manager-focus-week ()
-  "Focus on the Week section and collapse others."
-  (interactive)
-  (goto-char (point-min))
-  (if (search-forward "[" nil t)
-      (progn
-        ;; Collapse all sections except Week
-        (task-manager-collapse-except "Week")
-        ;; Refresh to ensure expansion state is applied
-        (task-manager-refresh)
-        ;; Find and move to the Week section
-        (goto-char (point-min))
-        (if (search-forward "[-] Week" nil t)
-            (progn
-              (forward-line 1)
-              (task-manager-safe-recenter)
-              (message "Focused on Week"))
-          (message "Week section not found")))
-    (message "Could not locate sections")))
-
-(defun task-manager-focus-monday ()
-  "Focus on the Monday section and collapse others."
-  (interactive)
-  (goto-char (point-min))
-  (if (search-forward "[" nil t)
-      (progn
-        ;; Collapse all sections except Monday
-        (task-manager-collapse-except "Monday")
-        ;; Refresh to ensure expansion state is applied
-        (task-manager-refresh)
-        ;; Find and move to the Monday section
-        (goto-char (point-min))
-        (if (search-forward "[-] Monday" nil t)
-            (progn
-              (forward-line 1)
-              (task-manager-safe-recenter)
-              (message "Focused on Monday"))
-          (message "Monday section not found")))
-    (message "Could not locate sections")))
-
-(defun task-manager-focus-calendar ()
-  "Focus on the Calendar section and collapse others."
-  (interactive)
-  (goto-char (point-min))
-  (if (search-forward "[" nil t)
-      (progn
-        ;; Collapse all sections except Calendar
-        (task-manager-collapse-except "Calendar")
-        ;; Refresh to ensure expansion state is applied
-        (task-manager-refresh)
-        ;; Find and move to the Calendar section
-        (goto-char (point-min))
-        (if (search-forward "[-] Calendar" nil t)
-            (progn
-              (forward-line 1)
-              (task-manager-safe-recenter)
-              (message "Focused on Calendar"))
-          (message "Calendar section not found")))
-    (message "Could not locate sections")))
-
-(defun task-manager-focus-someday ()
-  "Focus on the Someday section and collapse others."
-  (interactive)
-  (goto-char (point-min))
-  (if (search-forward "[" nil t)
-      (progn
-        ;; Collapse all sections except Someday
-        (task-manager-collapse-except "Someday")
-        ;; Refresh to ensure expansion state is applied
-        (task-manager-refresh)
-        ;; Find and move to the Someday section
-        (goto-char (point-min))
-        (if (search-forward "[-] Someday" nil t)
-            (progn
-              (forward-line 1)
-              (task-manager-safe-recenter)
-              (message "Focused on Someday"))
-          (message "Someday section not found")))
-    (message "Could not locate sections")))
-
-(defun task-manager-focus-archive ()
-  "Focus on the Archive section and collapse others."
-  (interactive)
-  (goto-char (point-min))
-  (if (search-forward "[" nil t)
-      (progn
-        ;; Collapse all sections except Archive
-        (task-manager-collapse-except "Archive")
-        ;; Refresh to ensure expansion state is applied
-        (task-manager-refresh)
-        ;; Find and move to the Archive section
-        (goto-char (point-min))
-        (if (search-forward "[-] Archive" nil t)
-            (progn
-              (forward-line 1)
-              (task-manager-safe-recenter)
-              (message "Focused on Archive"))
-          (message "Archive section not found")))
-    (message "Could not locate sections")))
-
-(provide 'task-manager)
-
-;;; task-manager.el ends here 
