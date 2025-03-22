@@ -479,36 +479,65 @@
     (task-manager-refresh)))
 
 (defun task-manager-delete-tasks ()
-  "Move selected tasks to Archive section instead of permanently deleting them."
+  "Move selected tasks to Archive section if they're not in Archive,
+otherwise permanently delete them."
   (interactive)
   (when task-manager-selected-tasks
     (let ((archive-tasks (gethash "Archive" task-manager-tasks))
-          (count 0))
+          (tasks-to-archive nil)
+          (tasks-to-delete nil))
+      
       ;; Save current state to undo history
       (task-manager-push-to-undo-history)
       
-      ;; Move each selected task to Archive
+      ;; Separate tasks between those to archive and those to delete
       (dolist (task task-manager-selected-tasks)
-        ;; Find and remove the task from its current section
-        (dolist (section task-manager-sections)
-          (unless (string= section "Archive")
+        (let ((found nil))
+          ;; Find the tasks in their sections
+          (dolist (section task-manager-sections)
             (let ((tasks (gethash section task-manager-tasks)))
-              (when (member task tasks)
-                ;; Remove from current section
-                (setf (gethash section task-manager-tasks)
-                      (remove task tasks))
-                ;; Add to Archive section
-                (push task archive-tasks)
-                (setq count (1+ count)))))))
+              (when (and (member task tasks) (not found))
+                (setq found t)
+                (if (string= section "Archive")
+                    ;; If task is in Archive, mark for deletion
+                    (push task tasks-to-delete)
+                  ;; Otherwise mark for archiving
+                  (push (cons section task) tasks-to-archive)))))))
       
-      ;; Update Archive section
-      (puthash "Archive" archive-tasks task-manager-tasks)
+      ;; Process tasks to archive
+      (let ((archive-count 0))
+        (dolist (section-task tasks-to-archive)
+          (let ((section (car section-task))
+                (task (cdr section-task)))
+            ;; Remove from current section
+            (setf (gethash section task-manager-tasks)
+                  (remove task (gethash section task-manager-tasks)))
+            ;; Add to Archive
+            (push task archive-tasks)
+            (setq archive-count (1+ archive-count))))
+        
+        ;; Update Archive with newly archived tasks
+        (when (> archive-count 0)
+          (puthash "Archive" archive-tasks task-manager-tasks)
+          (message "%d task(s) moved to Archive section." archive-count)))
+      
+      ;; Process tasks to delete (from Archive)
+      (when tasks-to-delete
+        (if (y-or-n-p (format "Permanently delete %d task(s) from Archive?" 
+                             (length tasks-to-delete)))
+            (progn
+              ;; Remove tasks from Archive
+              (setf (gethash "Archive" task-manager-tasks)
+                    (seq-filter (lambda (task) 
+                                 (not (member task tasks-to-delete)))
+                               (gethash "Archive" task-manager-tasks)))
+              (message "%d task(s) permanently deleted." (length tasks-to-delete)))
+          (message "Deletion cancelled.")))
       
       ;; Clear selected tasks
       (setq task-manager-selected-tasks nil)
       (task-manager-save-tasks)
-      (task-manager-refresh)
-      (message "%d task(s) moved to Archive section." count))))
+      (task-manager-refresh))))
 
 (defun task-manager-delete-section-tasks ()
   "Delete all tasks in a chosen section permanently."
@@ -1000,8 +1029,22 @@ Selecting 'None' will clear recurring status."
     (task-manager-refresh)
     (message "Due date cleared.")))
 
+(defun task-manager-get-all-tags ()
+  "Extract all unique tags from all tasks."
+  (let ((all-tags '()))
+    (dolist (section task-manager-sections)
+      (dolist (task (gethash section task-manager-tasks))
+        (when (string-match "\\[Tags: \\([^]]+\\)\\]" task)
+          (let* ((tags-string (match-string 1 task))
+                 (tags-list (split-string tags-string "," t "\\s-*")))
+            (dolist (tag tags-list)
+              (unless (member tag all-tags)
+                (push tag all-tags)))))))
+    all-tags))
+
 (defun task-manager-add-tags ()
-  "Add tags to a task. If cursor is on a task, use that task."
+  "Add tags to a task. If cursor is on a task, use that task.
+Shows a list of existing tags for selection and offers an option to delete all tags."
   (interactive)
   (let* ((task-at-point (task-manager-get-task-at-point))
          (task (if task-at-point
@@ -1012,14 +1055,46 @@ Selecting 'None' will clear recurring status."
                    (task-manager-find-task-section task)))
          (existing-tags (and (string-match "\\[Tags: \\([^]]+\\)\\]" task)
                             (match-string 1 task)))
-         (tags-prompt (if existing-tags
-                         (format "Enter tags (currently: %s): " existing-tags)
-                       "Enter tags (comma separated): "))
-         (tags (read-string tags-prompt))
-         ;; Remove any existing tags
+         (all-tags (task-manager-get-all-tags))
+         (all-tags-with-options (append '("Delete all tags" "Enter new tags") all-tags))
+         (choice (completing-read 
+                  (if existing-tags
+                      (format "Choose option or tag (current tags: %s): " existing-tags)
+                    "Choose option or tag: ")
+                  all-tags-with-options))
+         (tags "")
          (task-without-tags (replace-regexp-in-string "\\[Tags: [^]]*\\]" "" task))
          (task-without-tags (string-trim task-without-tags))
-         (new-task (format "%s [Tags: %s]" task-without-tags tags)))
+         (new-task ""))
+    
+    (cond
+     ;; Delete all tags
+     ((string= choice "Delete all tags")
+      (setq new-task task-without-tags)
+      (message "All tags removed."))
+     
+     ;; Enter new tags manually
+     ((string= choice "Enter new tags")
+      (setq tags (read-string (if existing-tags
+                                 (format "Enter new tags (current: %s): " existing-tags)
+                               "Enter new tags (comma separated): ")))
+      (if (string-empty-p tags)
+          (setq new-task task-without-tags)
+        (setq new-task (format "%s [Tags: %s]" task-without-tags tags))))
+     
+     ;; Selected an existing tag
+     (t
+      (setq tags (if existing-tags
+                     (if (string-match-p (regexp-quote choice) existing-tags)
+                         ;; Remove tag if it already exists
+                         (let ((tag-list (split-string existing-tags "," t "\\s-*")))
+                           (string-join (remove choice tag-list) ", "))
+                       ;; Add tag if it doesn't exist
+                       (concat existing-tags ", " choice))
+                   choice))
+      (if (string-empty-p tags)
+          (setq new-task task-without-tags)
+        (setq new-task (format "%s [Tags: %s]" task-without-tags tags)))))
     
     ;; Replace old task with new one that includes tags info
     (when section
@@ -1037,7 +1112,7 @@ Selecting 'None' will clear recurring status."
     
     (task-manager-save-tasks)
     (task-manager-refresh)
-    (message "Tags for task set to %s." tags)))
+    (message "Tags updated.")))
 
 (defun task-manager-setting-reminders ()
   "Set reminders for tasks. If cursor is on a task, use that task."
