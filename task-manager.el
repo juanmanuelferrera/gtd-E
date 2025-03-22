@@ -85,6 +85,32 @@
 (defvar task-manager-undo-history-size 15
   "Maximum number of states to keep in the undo history.")
 
+;; Define button types for links
+(define-button-type 'task-url-link
+  'action 'task-manager-browse-url-button
+  'follow-link t
+  'help-echo "Click to open this URL in browser"
+  'face 'link)
+
+(define-button-type 'task-file-link
+  'action 'task-manager-find-file-button
+  'follow-link t
+  'help-echo "Click to open this file"
+  'face 'link)
+
+(defvar task-manager-backup-directory
+  (expand-file-name "~/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/backups/")
+  "Directory to store task manager backups.")
+
+(defvar task-manager-backup-interval (* 2 60 60)  ; 2 hours in seconds
+  "Interval between automatic backups in seconds.")
+
+(defvar task-manager-last-backup-time 0
+  "Timestamp of the last backup.")
+
+(defvar task-manager-max-backups 3
+  "Maximum number of backup files to keep.")
+
 (defun task-manager-get-task-at-point ()
   "Get the task at the current point, returning a cons of (section . task)."
   (let ((task-found nil)
@@ -243,41 +269,52 @@
   (task-manager-refresh)
   (message "Commands %s" (if task-manager-show-commands "shown" "hidden")))
 
+(defun task-manager-browse-url-button (button)
+  "Action function for URL buttons that works in read-only buffers."
+  (let ((url (button-get button 'url)))
+    (when url
+      (browse-url url))))
+
+(defun task-manager-find-file-button (button)
+  "Action function for file path buttons that works in read-only buffers."
+  (let ((file-path (button-get button 'file-path)))
+    (when file-path
+      (find-file file-path))))
+
 (defun task-manager-linkify-text (text)
   "Make URLs and file paths in TEXT clickable."
   (with-temp-buffer
     (insert text)
     (goto-char (point-min))
-    ;; Detect and linkify URLs - use a more robust pattern
-    (while (re-search-forward "\\b\\(https?://\\|www\\.\\)[^ \t\n\r,;()\"']+" nil t)
-      (let* ((match (match-string 0))
-             (url (if (string-match-p "^www\\." match)
-                     (concat "http://" match)
-                   match))
-             (bounds (match-data)))
-        (set-text-properties (car bounds) (cadr bounds)
-                             `(face link
-                               mouse-face highlight
-                               help-echo ,(format "mouse-1: visit %s" url)
-                               keymap ,button-map
-                               follow-link t
-                               action (lambda (_) (browse-url ,url))))))
     
-    ;; Detect and linkify file paths - make pattern more selective
+    ;; Detect and linkify URLs
+    (while (re-search-forward "\\b\\(https?://\\|www\\.\\)[^ \t\n\r,;()\"']+" nil t)
+      (let* ((start (match-beginning 0))
+             (end (match-end 0))
+             (match (match-string 0))
+             (url (if (string-match-p "^www\\." match)
+                      (concat "http://" match)
+                    match)))
+        ;; Use make-button which works better in read-only buffers
+        (delete-region start end)
+        (insert-button match
+                       :type 'task-url-link
+                       'url url)))
+    
+    ;; Detect and linkify file paths
     (goto-char (point-min))
     (while (re-search-forward "\\b\\(file://\\|~/\\|/\\)[^ \t\n\r,;()\"']+" nil t)
-      (let* ((match (match-string 0))
+      (let* ((start (match-beginning 0))
+             (end (match-end 0))
+             (match (match-string 0))
              (file-path (if (string-match-p "^file:" match)
                            (substring match 5)
-                         match))
-             (bounds (match-data)))
-        (set-text-properties (car bounds) (cadr bounds)
-                             `(face link
-                               mouse-face highlight
-                               help-echo ,(format "mouse-1: open %s" file-path)
-                               keymap ,button-map
-                               follow-link t
-                               action (lambda (_) (find-file ,file-path))))))
+                         match)))
+        ;; Use make-button which works better in read-only buffers
+        (delete-region start end)
+        (insert-button match 
+                       :type 'task-file-link
+                       'file-path file-path)))
     
     (buffer-string)))
 
@@ -286,8 +323,8 @@
   (let ((inhibit-read-only t)
         (today (format-time-string "%Y-%m-%d")))
     (erase-buffer)
-    (insert "GTD + E - Task Manager\n")
-    (insert "====================\n\n")
+    (insert "GTD + Emacs\n")
+    (insert "============\n\n")
     
     ;; Display tasks due today at the top
     (insert (propertize "Due Today" 'face '(:inherit font-lock-keyword-face :weight bold)))
@@ -312,9 +349,28 @@
                      (task (cdr task-pair))
                      (selected (member task task-manager-selected-tasks))
                      (display-task (replace-regexp-in-string "^TODAY " "" task)))
-                ;; Make links clickable in display-task
+                ;; Insert checkbox marker
                 (insert (format "  [%s] " (if selected "X" " ")))
-                (insert (task-manager-linkify-text display-task))
+                
+                ;; Process and insert the task with active links
+                (let ((link-start 0)
+                      (processed-text ""))
+                  ;; Find URLs and insert as buttons
+                  (while (string-match "\\(https?://[^ \t\n\r,;()\"']+\\)" display-task link-start)
+                    (let ((start (match-beginning 1))
+                          (end (match-end 1))
+                          (url (match-string 1 display-task)))
+                      ;; Add text before link
+                      (insert (substring display-task link-start start))
+                      ;; Add button for link
+                      (insert-button url
+                                    :type 'task-url-link
+                                    'url url)
+                      (setq link-start end)))
+                  
+                  ;; Add any remaining text after last link
+                  (insert (substring display-task link-start)))
+                
                 (insert (format " (in %s)\n" section))))
             (insert "\n"))
         (insert "  No tasks due today\n\n")))
@@ -334,9 +390,27 @@
           (dolist (task tasks)
             (let ((selected (member task task-manager-selected-tasks))
                   (display-task (replace-regexp-in-string "^TODAY " "" task)))
-              ;; Make links clickable in display-task
+              ;; Insert checkbox marker
               (insert (format "  [%s] " (if selected "X" " ")))
-              (insert (task-manager-linkify-text display-task))
+              
+              ;; Process and insert the task with active links
+              (let ((link-start 0))
+                ;; Find URLs and insert as buttons
+                (while (string-match "\\(https?://[^ \t\n\r,;()\"']+\\)" display-task link-start)
+                  (let ((start (match-beginning 1))
+                        (end (match-end 1))
+                        (url (match-string 1 display-task)))
+                    ;; Add text before link
+                    (insert (substring display-task link-start start))
+                    ;; Add button for link
+                    (insert-button url
+                                  :type 'task-url-link
+                                  'url url)
+                    (setq link-start end)))
+                
+                ;; Add any remaining text after last link
+                (insert (substring display-task link-start)))
+              
               (insert "\n"))))))
     
     ;; Display commands if enabled, otherwise show a hint
@@ -405,23 +479,36 @@
     (task-manager-refresh)))
 
 (defun task-manager-delete-tasks ()
-  "Delete selected tasks permanently."
+  "Move selected tasks to Archive section instead of permanently deleting them."
   (interactive)
-  (when (and task-manager-selected-tasks
-             (y-or-n-p "Permanently delete selected tasks?"))
-    (dolist (task task-manager-selected-tasks)
-      ;; Find and remove the task from its current section
-      (dolist (section task-manager-sections)
-        (let ((tasks (gethash section task-manager-tasks)))
-          (when (member task tasks)
-            ;; Remove from current section
-            (setf (gethash section task-manager-tasks)
-                  (remove task tasks))))))
-    ;; Clear selected tasks
-    (setq task-manager-selected-tasks nil)
-    (task-manager-save-tasks)
-    (task-manager-refresh)
-    (message "Tasks permanently deleted.")))
+  (when task-manager-selected-tasks
+    (let ((archive-tasks (gethash "Archive" task-manager-tasks))
+          (count 0))
+      ;; Save current state to undo history
+      (task-manager-push-to-undo-history)
+      
+      ;; Move each selected task to Archive
+      (dolist (task task-manager-selected-tasks)
+        ;; Find and remove the task from its current section
+        (dolist (section task-manager-sections)
+          (unless (string= section "Archive")
+            (let ((tasks (gethash section task-manager-tasks)))
+              (when (member task tasks)
+                ;; Remove from current section
+                (setf (gethash section task-manager-tasks)
+                      (remove task tasks))
+                ;; Add to Archive section
+                (push task archive-tasks)
+                (setq count (1+ count)))))))
+      
+      ;; Update Archive section
+      (puthash "Archive" archive-tasks task-manager-tasks)
+      
+      ;; Clear selected tasks
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      (message "%d task(s) moved to Archive section." count))))
 
 (defun task-manager-delete-section-tasks ()
   "Delete all tasks in a chosen section permanently."
@@ -563,22 +650,74 @@
       (task-manager-refresh)
       (message "Undid last operation"))))
 
+(defun task-manager-ensure-backup-directory ()
+  "Ensure the backup directory exists."
+  (unless (file-exists-p task-manager-backup-directory)
+    (make-directory task-manager-backup-directory t)))
+
+(defun task-manager-cleanup-backups ()
+  "Keep only the maximum number of latest backup files."
+  (when (file-exists-p task-manager-backup-directory)
+    (let* ((backup-files (directory-files task-manager-backup-directory t "tasks-backup-.*\\.org$"))
+           (sorted-backups (sort backup-files (lambda (a b)
+                                                (let ((time-a (file-attribute-modification-time (file-attributes a)))
+                                                      (time-b (file-attribute-modification-time (file-attributes b))))
+                                                  (time-less-p time-b time-a))))))
+      ;; Delete old backups exceeding the maximum
+      (when (> (length sorted-backups) task-manager-max-backups)
+        (dolist (old-backup (nthcdr task-manager-max-backups sorted-backups))
+          (when (file-exists-p old-backup)
+            (delete-file old-backup)
+            (message "Deleted old backup: %s" old-backup)))))))
+
+(defun task-manager-create-backup ()
+  "Create a backup of the tasks.org file."
+  (task-manager-ensure-backup-directory)
+  (when (file-exists-p task-manager-save-file)
+    (let* ((current-time (current-time))
+           (timestamp (format-time-string "%Y%m%d-%H%M%S" current-time))
+           (backup-file (expand-file-name (format "tasks-backup-%s.org" timestamp)
+                                         task-manager-backup-directory)))
+      ;; Instead of copying the file directly, we'll recreate it with consistent section names
+      (with-temp-buffer
+        ;; Add header
+        (insert "#+TITLE: Task Manager Data\n\n")
+        
+        ;; Write sections with consistent names
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when tasks
+              (insert (format "* %s\n" section))
+              (dolist (task (reverse tasks)) ;; reverse to maintain order
+                (insert (format "** %s\n" task))))))
+        
+        ;; Write to backup file
+        (write-region (point-min) (point-max) backup-file))
+      
+      (setq task-manager-last-backup-time (float-time current-time))
+      (message "Created backup of tasks.org at %s" backup-file)
+      
+      ;; Clean up old backups
+      (task-manager-cleanup-backups))))
+
+(defun task-manager-backup-if-needed ()
+  "Create a backup if enough time has passed since the last backup."
+  (let ((current-time (float-time)))
+    (when (> (- current-time task-manager-last-backup-time) task-manager-backup-interval)
+      (task-manager-create-backup))))
+
 (defun task-manager-save-tasks ()
-  "Save tasks to the save file, preserving beorg formatting."
+  "Save tasks to the save file using the same section names."
   (interactive)
   ;; Only push to history when saving as a result of a change, not on startup
   (when (called-interactively-p 'any)
     (task-manager-push-to-undo-history))
   
+  ;; Check if backup is needed
+  (task-manager-backup-if-needed)
+  
   ;; Read existing file to preserve structure and format
-  (let ((existing-content "")
-        (section-map '(("Inbox" . "Inbox")
-                       ("Today" . "Next Actions")
-                       ("Week" . "Projects")
-                       ("Monday" . "Monday")
-                       ("Calendar" . "Calendar")
-                       ("Someday" . "Someday")
-                       ("Archive" . "Archive"))))
+  (let ((existing-content ""))
     
     ;; Try to read existing content to preserve formatting
     (when (file-exists-p task-manager-save-file)
@@ -590,19 +729,17 @@
     (with-temp-buffer
       ;; If there's no existing content, add standard header
       (if (string-empty-p existing-content)
-          (insert "#+TITLE: beorg Tasks\n\n")
+          (insert "#+TITLE: Task Manager\n\n")
         ;; Otherwise preserve header until first heading
         (string-match "^\\* " existing-content)
         (let ((header (substring existing-content 0 (match-beginning 0))))
           (insert header)))
       
-      ;; Write sections and tasks
-      (dolist (section-pair section-map)
-        (let* ((our-section (car section-pair))
-               (beorg-section (cdr section-pair))
-               (tasks (gethash our-section task-manager-tasks)))
+      ;; Write sections and tasks directly with the original names
+      (dolist (section task-manager-sections)
+        (let ((tasks (gethash section task-manager-tasks)))
           (when tasks
-            (insert (format "* %s\n" beorg-section))
+            (insert (format "* %s\n" section))
             (dolist (task (reverse tasks)) ;; reverse to maintain order
               (insert (format "** %s\n" task))))))
       
@@ -614,13 +751,12 @@
 (defun task-manager-load-tasks ()
   "Load tasks from the save file."
   (interactive)
+  ;; Initialize empty lists for all sections
+  (dolist (section task-manager-sections)
+    (puthash section nil task-manager-tasks))
+  
   (when (file-exists-p task-manager-save-file)
-    ;; Reset the tasks hash table
-    (setq task-manager-tasks (make-hash-table :test 'equal))
-    (dolist (section task-manager-sections)
-      (puthash section '() task-manager-tasks))
-    
-    ;; Parse the file
+    ;; Read and parse the org file
     (with-temp-buffer
       (insert-file-contents task-manager-save-file)
       (org-mode)
@@ -629,41 +765,23 @@
         (while (not (eobp))
           (cond
            ;; Section header (level 1 heading)
-           ((looking-at "^\\* \\(.+\\)")
-            (let ((heading (match-string 1)))
-              ;; Map beorg headings to our sections
-              (cond
-               ((string-match-p "Inbox" heading)
-                (setq current-section "Inbox"))
-               ((string-match-p "Next Actions" heading)
-                (setq current-section "Today"))
-               ((string-match-p "Projects" heading)
-                (setq current-section "Week"))
-               ((string-match-p "Someday" heading)
-                (setq current-section "Someday"))
-               ((string-match-p "Archive" heading)
-                (setq current-section "Archive"))
-               ((string-match-p "Monday" heading)
-                (setq current-section "Monday"))
-               ((string-match-p "Calendar" heading)
-                (setq current-section "Calendar"))
-               (t (setq current-section "Inbox")))))
+           ((looking-at "^\\* \\(.+\\)$")
+            (setq current-section (match-string 1))
+            ;; Make sure section exists (handle custom sections)
+            (unless (member current-section task-manager-sections)
+              (add-to-list 'task-manager-sections current-section)
+              (puthash current-section nil task-manager-tasks)))
            
-           ;; Task entry (level 2 heading)
-           ((and current-section (looking-at "^\\*\\* \\(.+\\)"))
+           ;; Task (level 2 heading)
+           ((and current-section
+                 (looking-at "^\\*\\* \\(.+\\)$"))
             (let ((task (match-string 1)))
-              (push task (gethash current-section task-manager-tasks))))
-           
-           ;; Task entry with deeper level (levels 3+)
-           ((and current-section (looking-at "^\\*\\*\\* \\(.+\\)"))
-            (let ((task (match-string 1)))
-              (push task (gethash current-section task-manager-tasks)))))
-          
-          (forward-line 1))))
-    
-    (message "Tasks loaded from %s" task-manager-save-file)
-    (when (called-interactively-p 'any)
-      (task-manager-refresh))))
+              (when (and task (not (string-empty-p (string-trim task))))
+                (push task (gethash current-section task-manager-tasks))))))
+          (forward-line)))
+      
+      ;; Custom tasks processing after loading
+      (message "Tasks loaded from %s" task-manager-save-file))))
 
 ;; New Functions
 
@@ -824,7 +942,7 @@ Selecting 'None' will clear recurring status."
              (due-date (format "%04d-%02d-%02d" 
                              (nth 2 date)   ; year
                              (nth 0 date)   ; month
-                             (nth 1 date))) ; day
+                             (nth 1 date)))
              ;; Remove any existing due date tag
              (task-without-due (replace-regexp-in-string "\\[Due: [^]]*\\]" "" task))
              (task-without-due (string-trim task-without-due)))
@@ -1455,6 +1573,34 @@ Selecting 'None' will clear recurring status."
     (forward-line 1)
     
     (message "Moved %d tasks from Inbox and Today to Week." count)))
+
+;; Function to manually create a backup
+(defun task-manager-manual-backup ()
+  "Manually create a backup of the tasks.org file."
+  (interactive)
+  (task-manager-create-backup)
+  (message "Manual backup created."))
+
+;; Setup a timer for periodic backups
+(defvar task-manager-backup-timer nil
+  "Timer object for automatic backups.")
+
+(defun task-manager-start-backup-timer ()
+  "Start the backup timer."
+  (when task-manager-backup-timer
+    (cancel-timer task-manager-backup-timer))
+  (setq task-manager-backup-timer
+        (run-with-timer 
+         task-manager-backup-interval 
+         task-manager-backup-interval 
+         'task-manager-backup-if-needed)))
+
+;; Start the backup timer when the package is loaded
+(eval-after-load 'task-manager2
+  '(task-manager-start-backup-timer))
+
+;; Add key binding for manual backup
+(define-key task-manager-mode-map (kbd "B") 'task-manager-manual-backup)
 
 (provide 'task-manager2)
 
