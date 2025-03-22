@@ -1,108 +1,90 @@
+# GTD + Emacs · Task Manager
 
-https://github.com/user-attachments/assets/bd8b81bc-ebde-4b3a-84c7-90f3283170af
+## Overview
+`task-manager2.el` is an enhanced task management package for Emacs, designed to help you efficiently organize and manage your tasks. It includes a variety of features like sections for Inbox, Today, Week, and more, along with functionalities for searching, setting priorities, reminders, tags, and exporting/importing tasks.
 
-# Gtd-E
-
-# Configuration
-
-1. Adjust the path to your local `task-manager.el`
-   
-   (add-to-list 'load-path "/Users/juanmanuelferreradiaz/.emacs.d/site-lisp/task-manager/")
-   
-   (require 'task-manager)
-
-3. Declare the path to the folder where tasks.org lives for saving tasks
-   
-   (defcustom task-manager-save-file
-     (expand-file-name "tasks.org" "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloudcomappsonthemove~beorg/Documents/my-gtd/")
-   
-     "File where task manager data is saved."
-   
-     :type 'file
-   
-     :group 'task-manager)
-
-
-# Gtd+E Task Manager Overview
-
-The Gtd+E Task Manager is a simple elisp-based system for integrating the Getting Things Done (GTD) methodology with enhanced task organization. It provides sections for different tasks, allowing efficient tracking and prioritizing.
+## Features
+- Sections: Organized into multiple sections including Inbox, Today, Week, Monday, Calendar, Someday, and Archive.
+- Task Management: Add, edit, delete, and archive tasks. Support for single and bulk operations.
+- Recurring Tasks: Easily set and manage recurring tasks (daily, weekly, monthly).
+- Prioritization: Assign priorities (high, medium, low) to tasks.
+- Due Dates: Set and clear due dates for tasks.
+- Tags: Add and manage tags for effective categorization.
+- Search: Search for tasks across all sections.
+- Export/Import: Export tasks to various formats (org, JSON, CSV) and import from these formats.
+- Undo History: Supports undo functionality for recent changes.
+- Backup: Automatic and manual backup options to prevent data loss.
 
 ## Task Sections
+- Inbox: Temporary space for new tasks -> `(i)` to focus on section.
+- Today: Tasks to complete today -> `(t)` to focus on section.
+- Week: Tasks planned for the week -> `(w)` to focus on section.
+- Monday: Planning tasks during the weekly review -> `(o)` to focus on section.
+- Calendar: Deadlined tasks, sorted by date -> `(c)` to focus on section.
+- Someday: Future tasks or ideas -> `(s)` to focus on section.
+- Archive: Completed or outdated tasks -> `(F)` to focus on section.
 
-- Inbox: Temporary space for new tasks -> (i) to focus on section.
-- Today: Tasks to complete today -> (t) to focus on section.
-- Week: Tasks planned for the week -> (w) to focus on section.
-- Monday: Planning tasks during the weekly review -> (o) to focus on section.
-- Calendar: Deadlined tasks, sorted by date-> (c) to focus on section.
-- Someday: Future tasks or ideas -> (s) to focus on section.
-- Archive: Completed or outdated tasks -> (r) to focus on section.
-
-# Daily Routine
-
+## Daily Routine
 At the start of each day:
-1. Open the Today section and select tasks to focus on.
-2. Review the Week section to align with weekly goals.
-3. Adjust tasks between sections as necessary.
+- Open the Today section and select tasks to focus on.
+- Review the Week section to align with weekly goals.
+- Adjust tasks between sections as necessary.
 
-# Weekly Review
-
+## Weekly Review
 Conduct a review every Monday:
 - Assess progress on tasks in Week and Today sections.
 - Evaluate Monday section tasks for movement to Week or Today.
 - Adjust accordingly.
 
-# Monthly Review
-
+## Monthly Review
 On the first of each month:
 - Inspect Someday section tasks.
 - Sort relevant tasks into Today, Week, or Monday sections, or leave in Someday.
 - Archive tasks that can be closed.
 
-# Task Operations
+## Key Commands
+- a: Add a single task
+- A: Add multiple tasks
+- k: Delete selected tasks (move to Archive)
+- K: Delete all tasks in a section
+- m: Move selected tasks to another section
+- RET: Edit task at current position
+- S: Search tasks
+- r: Set task as recurring 
+- d: Set due date
+- T: Add tags
+- x: Export tasks
+- I: Import tasks
+- u: Undo last operation
+- B: Manual backup
 
-- Add Tasks: Use keybinding `a` to add to Inbox or directly to sections.
-- Edit Tasks: Click on a task to edit inline.
-- Delete Tasks: Use `k` to delete selected tasks.
-- Move Tasks: Use `m` to move to another section.
-- Focus: Collapse other sections to focus on one.
+## Installation
+To install `task-manager2.el`, follow these steps:
 
-# Calendar Functionality
+1. Download the file `task-manager2.el` to your Emacs load path.
+2. Add the following to your Emacs configuration (e.g., `init.el`):
 
-The calendar feature enhances time-sensitive task management.
+   ```elisp
+   (require 'task-manager2)
+   ```
 
-## Key Features
+3. Restart Emacs or evaluate the above line in your configuration.
 
-- Task Date Insertion: Use `C-c d` to bring up a calendar for quick date selection.
-- Automatic Calendar Section: Tasks with dates appear in "Calendar Tasks" at the top.
-- Sorting by Date: Calendar section tasks are sorted by due dates.
-- Daily Review: Check Calendar section for tasks due today.
+## Usage
+To start the task manager, run:
 
-## Using Calendar Functionality
+```elisp
+M-x task-manager2-init
+```
 
-- Navigate with arrow keys, select a date with `RET`, or cancel with `q`.
-- Regularly check the Calendar section for updates.
+## Backup and Data Persistence
+The task manager supports automatic backups every 2 hours. You can also create backups manually with the `B` command while in the task manager buffer.
 
-# Conclusion
+## License
+This project is licensed under the MIT License.
 
-The calendar functionality streamlines task management, ensuring visibility of due tasks for effective prioritization and deadline tracking.
+## Contribution
+Contributions are welcome! Please open issues or pull requests if you'd like to improve this package.
 
-# Task Management Key Bindings
-
-- `a`: Add a single task.
-- `A`: Add multiple tasks.
-- `k`: Delete selected tasks.
-- `m`: Move selected tasks.
-- `W`: Move all tasks from Inbox and Today to Week.
-- `D`: Delete all tasks with confirmation.
-- `z`: Expand/collapse all sections.
-- `e`: Toggle section expansion.
-- `n` / `p`: Move to next/previous task.
-- `RET`: Edit the task under the cursor.
-
-# Credits
-
-This software is based on Gtd+R paper system by Kenji Ohta:
-https://gtd-r.blogspot.com/
-
-https://github.com/user-attachments/assets/6ab7d15c-89c4-46ce-a318-6e5169e6b687
-
+## Acknowledgments
+Thanks to all contributors and the Emacs community for their continuous support and contributions to open-source tools.
