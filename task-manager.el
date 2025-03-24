@@ -168,10 +168,7 @@
 (defun task-manager-clear-recurring ()
   "Clear the recurring status from a task. If cursor is on a task, use that task."
   (interactive)
-  (let* ((current-pos (point))
-         (current-line (line-number-at-pos))
-         (current-column (current-column))
-         (task-at-point (task-manager-get-task-at-point))
+  (let* ((task-at-point (task-manager-get-task-at-point))
          (task (if task-at-point
                   (cdr task-at-point)
                 (completing-read "Select task to clear recurring: " (task-manager-all-tasks))))
@@ -182,35 +179,23 @@
          (new-task (replace-regexp-in-string "\\[Recurring: [^]]*\\]" "" task))
          (new-task (string-trim new-task)))
     
-    ;; Remember if we're on this task for cursor positioning
-    (let ((on-updated-task (and task-at-point 
-                              (string= task (cdr task-at-point)))))
-      
-      ;; Replace old task with new one
-      (when section
-        (setf (gethash section task-manager-tasks)
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      (gethash section task-manager-tasks))))
-      
-      ;; Update selected tasks if needed
-      (when (member task task-manager-selected-tasks)
-        (setq task-manager-selected-tasks
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      task-manager-selected-tasks)))
-      
-      (task-manager-save-tasks)
-      (task-manager-refresh)
-      
-      ;; Restore cursor position
-      (if on-updated-task
-          (task-manager-find-and-position-on-task new-task section)
-        (goto-char (point-min))
-        (forward-line (1- current-line))
-        (move-to-column current-column))
-      
-      (message "Recurring status cleared."))))
+    ;; Replace old task with new one
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Recurring status cleared.")))
 
 ;;;###autoload
 (defun task-manager2-init ()
@@ -341,31 +326,8 @@
 
 (defun task-manager-refresh ()
   "Refresh the display of tasks in the task manager."
-  (let* ((inhibit-read-only t)
-         (today (format-time-string "%Y-%m-%d"))
-         ;; Save cursor position information before refresh
-         (old-line (line-number-at-pos))
-         (old-column (current-column))
-         (old-point (point))
-         ;; Try to identify what we're looking at for better position recovery
-         (line-content (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
-         (on-task-line (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" line-content))
-         (on-section-header nil)
-         (task-text nil)
-         (section-name nil)
-         (marker (point-marker)))
-    
-    ;; Identify what we're looking at
-    (when on-task-line
-      (setq task-text (match-string 2 line-content)))
-    
-    ;; Check if we're on a section header line
-    (dolist (section task-manager-sections)
-      (when (string-match-p (concat "^" (regexp-quote section) " (") line-content)
-        (setq on-section-header t)
-        (setq section-name section)))
-    
-    ;; Refresh buffer content
+  (let ((inhibit-read-only t)
+        (today (format-time-string "%Y-%m-%d")))
     (erase-buffer)
     (insert "GTD + Emacs\n")
     (insert "============\n\n")
@@ -471,64 +433,33 @@
           (insert "  S: Search tasks\n")
           (insert "  s: Focus on Someday section\n")
           (insert "  r: Set recurring task\n")
-          (insert "  R: Clear recurring attribute\n")
+          (insert "  R: Clear recurring status\n")
           (insert "  V: View all recurring tasks\n")
           (insert "  F: Focus on Archive section\n")
-          (insert "  p: Previous task\n")
-          (insert "  n: Next task\n")
+          (insert "  p: Move to previous task\n")
+          (insert "  n: Move to next task\n")
           (insert "  d: Set due date\n")
           (insert "  D: Clear due date\n")
-          (insert "  T: Add or modify tags\n")
+          (insert "  T: Add tags\n")
           (insert "  t: Focus on Today section\n")
           (insert "  w: Focus on Week section\n")
+          (insert "  W: Move all tasks from Inbox and Today to Week\n")
           (insert "  o: Focus on Monday section\n")
           (insert "  c: Focus on Calendar section\n")
-          (insert "  C: Toggle commands help\n")
+          (insert "  C: Toggle commands visibility\n")
           (insert "  f: Filter tasks\n")
-          (insert "  X: Set reminder\n")
-          (insert "  b: Bulk edit selected tasks\n")
+          (insert "  X: Set reminders\n")
+          (insert "  b: Bulk edit tasks\n")
           (insert "  x: Export tasks\n")
-          (insert "  I: Import tasks\n")
           (insert "  i: Focus on Inbox section\n")
+          (insert "  I: Import tasks\n")
           (insert "  v: Save tasks\n")
           (insert "  L: Load tasks\n")
-          (insert "  SPC: Toggle task selection\n")
-          (insert "  u: Undo last action\n"))
-      (insert "\nPress 'C' to show commands"))
+          (insert "  u: Undo (up to 15 operations)\n"))
+      ;; Show reminder when commands are hidden
+      (insert "\nC to show commands\n"))
     
-    ;; Now restore cursor position intelligently
-    (goto-char (point-min))
-    (cond
-     ;; If we were on a task line, try to find that task again
-     ((and on-task-line task-text)
-      (let ((found nil))
-        (while (and (not found) (< (point) (point-max)))
-          (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-            (when (and (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" line)
-                     (string-match-p (regexp-quote task-text) (match-string 2 line)))
-              (setq found t)
-              (beginning-of-line))
-            (unless found
-              (forward-line 1))))))
-     
-     ;; If we were on a section header, try to find that section again
-     ((and on-section-header section-name)
-      (let ((found nil))
-        (while (and (not found) (< (point) (point-max)))
-          (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-            (when (string-match-p (concat "^" (regexp-quote section-name) " (") line)
-              (setq found t)
-              (beginning-of-line))
-            (unless found
-              (forward-line 1))))))
-     
-     ;; Otherwise try to restore by line number
-     (t
-      (forward-line (1- old-line))
-      (move-to-column old-column)))
-    
-    ;; Set buffer read-only
-    (setq buffer-read-only t)))
+    (goto-char (point-min))))
 
 ;; Task Functions
 (defun task-manager-add-task (section)
@@ -537,111 +468,22 @@
    (list (completing-read "Section: " task-manager-sections)))
   (let ((task (read-string "Enter new task: ")))
     (unless (string-empty-p task)
-      ;; Add the task to the specified section
       (push task (gethash section task-manager-tasks))
-      ;; Save and refresh the view
       (task-manager-save-tasks)
-      (task-manager-refresh)
-      ;; Position cursor at the new task
-      (when (get-buffer "*Task Manager*")
-        (switch-to-buffer "*Task Manager*")
-        ;; Navigate to the section
-        (goto-char (point-min))
-        (when (search-forward (format "%s (" section) nil t)
-          ;; Make sure section is expanded
-          (let ((expanded (gethash section task-manager-expanded-sections)))
-            (unless expanded
-              (task-manager-toggle-section-at-point)
-              (task-manager-refresh))
-            ;; Navigate to the first task in section (which should be our new task)
-            (forward-line 1)
-            (beginning-of-line)))
-        (message "Task added to %s" section))
-      
-      ;; Return to Task Manager buffer if we somehow left it
-      (when (and (not (string= (buffer-name) "*Task Manager*"))
-               (get-buffer "*Task Manager*"))
-        (switch-to-buffer "*Task Manager*")))))
+      (task-manager-refresh))))
 
 (defun task-manager-add-multiple-tasks (section)
   "Add multiple tasks to SECTION."
   (interactive
    (list (completing-read "Section: " task-manager-sections)))
-  
-  ;; Create a new buffer for task entry
-  (let ((buffer-name "*Task Manager Multi-Add*")
-        (target-section section))
-    (with-current-buffer (get-buffer-create buffer-name)
-      (text-mode)
-      (erase-buffer)
-      
-      ;; Display instructions
-      (insert "# Enter each task on a separate line\n")
-      (insert "# When done, press C-c C-c to add tasks and exit\n")
-      (insert "# Press C-c C-k to cancel\n")
-      (insert "# ----------------------------------------\n\n")
-      
-      ;; Create a new keymap for this buffer
-      (let ((map (make-sparse-keymap)))
-        (set-keymap-parent map text-mode-map)
-        
-        ;; Add tasks and exit
-        (define-key map (kbd "C-c C-c") 
-                    `(lambda () 
-                      (interactive)
-                      ;; Capture tasks from buffer
-                      (let ((tasks (split-string (buffer-substring-no-properties (point-min) (point-max)) "\n" t))
-                            (count 0))
-                        ;; Filter out comment lines
-                        (setq tasks (seq-filter (lambda (line) (not (string-prefix-p "#" (string-trim line)))) tasks))
-                        
-                        ;; Add the tasks directly inside this function
-                        (dolist (task tasks)
-                          (unless (string-empty-p task)
-                            (push task (gethash ',target-section task-manager-tasks))
-                            (setq count (1+ count))))
-                        
-                        ;; Save and update display
-                        (when (> count 0)
-                          (task-manager-save-tasks)
-                          (message "Added %d task(s) to %s section" count ',target-section)))
-                      
-                      ;; Kill the temp buffer
-                      (kill-buffer ,buffer-name)
-                      
-                      ;; Switch to task manager buffer
-                      (when (get-buffer "*Task Manager*")
-                        (switch-to-buffer "*Task Manager*")
-                        (task-manager-refresh)
-                        ;; Position cursor at the section with new tasks
-                        (goto-char (point-min))
-                        (when (search-forward (format "%s (" ',target-section) nil t)
-                          ;; Make sure section is expanded
-                          (let ((expanded (gethash ',target-section task-manager-expanded-sections)))
-                            (unless expanded
-                              (task-manager-toggle-section-at-point)
-                              (task-manager-refresh))
-                            ;; Navigate to the first task in section
-                            (forward-line 1)
-                            (beginning-of-line))))))
-        
-        ;; Cancel without adding tasks
-        (define-key map (kbd "C-c C-k")
-                    `(lambda ()
-                      (interactive)
-                      (message "Task addition cancelled")
-                      (kill-buffer ,buffer-name)
-                      
-                      ;; Switch back to task manager buffer
-                      (when (get-buffer "*Task Manager*")
-                        (switch-to-buffer "*Task Manager*"))))
-        
-        ;; Install the keymap
-        (use-local-map map)
-        (message "Type your tasks (one per line). Press C-c C-c when done, C-c C-k to cancel."))
-      
-      ;; Display the buffer for the user to edit
-      (switch-to-buffer buffer-name))))
+  (let ((tasks (split-string
+                (read-string "Enter tasks (one per line): ")
+                "\n" t)))
+    (dolist (task tasks)
+      (unless (string-empty-p task)
+        (push task (gethash section task-manager-tasks))))
+    (task-manager-save-tasks)
+    (task-manager-refresh)))
 
 (defun task-manager-delete-tasks ()
   "Move selected tasks to Archive section if they're not in Archive,
@@ -650,42 +492,7 @@ otherwise permanently delete them."
   (when task-manager-selected-tasks
     (let ((archive-tasks (gethash "Archive" task-manager-tasks))
           (tasks-to-archive nil)
-          (tasks-to-delete nil)
-          (current-line (line-number-at-pos))
-          (current-column (current-column))
-          (current-section nil)
-          (current-line-content (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
-          (next-task-marker nil)
-          (previous-task-marker nil))
-      
-      ;; Try to determine the current section and find adjacent tasks for cursor positioning
-      (save-excursion
-        (beginning-of-line)
-        ;; If we're on a task line, remember it and find adjacent tasks
-        (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" current-line-content)
-          ;; Try to find next task for positioning after deletion
-          (forward-line 1)
-          (let ((next-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-            (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" next-line)
-              (setq next-task-marker (match-string 2 next-line))))
-          
-          ;; Try to find previous task for positioning
-          (forward-line -2) ;; Go back two lines
-          (when (not (bobp))
-            (let ((prev-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-              (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" prev-line)
-                (setq previous-task-marker (match-string 2 prev-line))))))
-        
-        ;; Find current section
-        (goto-char (point-min))
-        (while (< (point) (point-max))
-          (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-            ;; Try to find the current section
-            (dolist (section task-manager-sections)
-              (when (string-match-p (concat "^" (regexp-quote section) " (") line)
-                (when (< (line-number-at-pos) current-line)
-                  (setq current-section section))))
-            (forward-line 1))))
+          (tasks-to-delete nil))
       
       ;; Save current state to undo history
       (task-manager-push-to-undo-history)
@@ -737,51 +544,7 @@ otherwise permanently delete them."
       ;; Clear selected tasks
       (setq task-manager-selected-tasks nil)
       (task-manager-save-tasks)
-      (task-manager-refresh)
-      
-      ;; Smart cursor positioning after task deletion
-      (cond
-       ;; If we have next task marker, try to find it and position there
-       ((and next-task-marker (not (string-empty-p next-task-marker)))
-        (goto-char (point-min))
-        (let ((found nil))
-          (while (and (not found) (< (point) (point-max)))
-            (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-              (when (and (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" line)
-                       (string-match-p (regexp-quote next-task-marker) (match-string 2 line)))
-                (setq found t)
-                (beginning-of-line))
-              (unless found
-                (forward-line 1))))
-          ;; If next task not found, try previous task
-          (when (and (not found) previous-task-marker (not (string-empty-p previous-task-marker)))
-            (goto-char (point-min))
-            (while (and (not found) (< (point) (point-max)))
-              (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-                (when (and (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" line)
-                         (string-match-p (regexp-quote previous-task-marker) (match-string 2 line)))
-                  (setq found t)
-                  (beginning-of-line))
-                (unless found
-                  (forward-line 1)))))))
-       
-       ;; If we know the section, go there
-       (current-section
-        (goto-char (point-min))
-        (let ((found nil))
-          (while (and (not found) (< (point) (point-max)))
-            (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-              (when (string-match-p (concat "^" (regexp-quote current-section) " (") line)
-                (setq found t)
-                (forward-line 1))
-              (unless found
-                (forward-line 1))))))
-       
-       ;; Otherwise try to restore position by line number
-       (t
-        (goto-char (point-min))
-        (forward-line (1- current-line))
-        (move-to-column current-column)))))))
+      (task-manager-refresh))))
 
 (defun task-manager-delete-section-tasks ()
   "Delete all tasks in a chosen section permanently."
@@ -804,134 +567,17 @@ otherwise permanently delete them."
 (defun task-manager-move-tasks ()
   "Move selected tasks to another section."
   (interactive)
-  (if (null task-manager-selected-tasks)
-      (message "No tasks selected. Select tasks with SPC first.")
-    (let ((target (completing-read "Move to section: " task-manager-sections))
-          (current-line (line-number-at-pos))
-          (current-column (current-column))
-          (current-section nil)
-          (current-line-content (buffer-substring-no-properties (line-beginning-position) (line-end-position)))
-          (next-task-marker nil)
-          (previous-task-marker nil)
-          (first-moved-task nil))
-      
-      ;; Try to determine the current section and find adjacent tasks for cursor positioning
-      (save-excursion
-        (beginning-of-line)
-        ;; If we're on a task line, remember it and find adjacent tasks
-        (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" current-line-content)
-          ;; Remember this task if it will be moved
-          (let ((task-text (match-string 2 current-line-content)))
-            (dolist (task task-manager-selected-tasks)
-              (when (string-match-p (regexp-quote task-text) task)
-                (setq first-moved-task task))))
-          
-          ;; Try to find next task for positioning after move
-          (forward-line 1)
-          (let ((next-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-            (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" next-line)
-              (setq next-task-marker (match-string 2 next-line))))
-          
-          ;; Try to find previous task for positioning
-          (forward-line -2) ;; Go back two lines
-          (when (not (bobp))
-            (let ((prev-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-              (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" prev-line)
-                (setq previous-task-marker (match-string 2 prev-line))))))
-        
-        ;; Find current section
-        (goto-char (point-min))
-        (while (< (point) (point-max))
-          (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-            ;; Try to find the current section
-            (dolist (section task-manager-sections)
-              (when (string-match-p (concat "^" (regexp-quote section) " (") line)
-                (when (< (line-number-at-pos) current-line)
-                  (setq current-section section))))
-            (forward-line 1))))
-      
-      ;; Save current state to undo history
-      (task-manager-push-to-undo-history)
-      
-      ;; Move tasks
-      (dolist (task task-manager-selected-tasks)
-        (dolist (section task-manager-sections)
-          (let ((tasks (gethash section task-manager-tasks)))
-            (when (member task tasks)
-              (setf (gethash section task-manager-tasks)
-                    (remove task tasks))
-              (push task (gethash target task-manager-tasks))))))
-      
-      ;; Clear selected tasks
-      (setq task-manager-selected-tasks nil)
-      (task-manager-save-tasks)
-      (task-manager-refresh)
-      
-      ;; Smart cursor positioning after task move
-      (cond
-       ;; If we were moving a task we were on, try to find it in target section
-       ((and first-moved-task target)
-        (goto-char (point-min))
-        (let ((found-section nil))
-          (while (and (not found-section) (< (point) (point-max)))
-            (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-              (when (string-match-p (concat "^" (regexp-quote target) " (") line)
-                (setq found-section t)
-                (forward-line 1) ;; Move to first task line after section header
-                ;; Now try to find the moved task
-                (let ((found-task nil))
-                  (while (and (not found-task) (< (point) (point-max)))
-                    (let ((task-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-                      (if (and (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" task-line)
-                               (string-match-p (regexp-quote first-moved-task) task-line))
-                          (setq found-task t)
-                        (forward-line 1))))))
-              (unless found-section
-                (forward-line 1))))))
-       
-       ;; If we have next task marker, try to find it and position there
-       ((and next-task-marker (not (string-empty-p next-task-marker)))
-        (goto-char (point-min))
-        (let ((found nil))
-          (while (and (not found) (< (point) (point-max)))
-            (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-              (when (and (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" line)
-                        (string-match-p (regexp-quote next-task-marker) (match-string 2 line)))
-                (setq found t)
-                (beginning-of-line))
-              (unless found
-                (forward-line 1))))
-          ;; If next task not found, try previous task
-          (when (and (not found) previous-task-marker (not (string-empty-p previous-task-marker)))
-            (goto-char (point-min))
-            (while (and (not found) (< (point) (point-max)))
-              (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-                (when (and (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" line)
-                          (string-match-p (regexp-quote previous-task-marker) (match-string 2 line)))
-                  (setq found t)
-                  (beginning-of-line))
-                (unless found
-                  (forward-line 1)))))))
-       
-       ;; If we know the section, go there
-       (current-section
-        (goto-char (point-min))
-        (let ((found nil))
-          (while (and (not found) (< (point) (point-max)))
-            (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-              (when (string-match-p (concat "^" (regexp-quote current-section) " (") line)
-                (setq found t)
-                (forward-line 1))
-              (unless found
-                (forward-line 1))))))
-       
-       ;; Otherwise try to restore position by line number
-       (t
-        (goto-char (point-min))
-        (forward-line (1- current-line))
-        (move-to-column current-column)))
-      
-      (message "Tasks moved to %s" target))))
+  (let ((target (completing-read "Move to section: " task-manager-sections)))
+    (dolist (task task-manager-selected-tasks)
+      (dolist (section task-manager-sections)
+        (let ((tasks (gethash section task-manager-tasks)))
+          (when (member task tasks)
+            (setf (gethash section task-manager-tasks)
+                  (remove task tasks))
+            (push task (gethash target task-manager-tasks))))))
+    (setq task-manager-selected-tasks nil)
+    (task-manager-save-tasks)
+    (task-manager-refresh)))
 
 (defun task-manager-toggle-all-sections ()
   "Toggle expansion of all sections."
@@ -949,18 +595,16 @@ otherwise permanently delete them."
     (task-manager-refresh)))
 
 (defun task-manager-toggle-task-at-point ()
-  "Toggle selection of task at point."
+  "Toggle selection of task at point and move to next task if possible."
   (interactive)
   (let ((task-found nil)
         (current-line (line-number-at-pos))
-        (current-column (current-column))
         (task-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
     ;; Check if we're on a task line (which may now contain text properties for links)
     (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*?\\)\\(?: (in \\(.*\\))?\\)?$" task-line)
       (let ((raw-task (match-string 2 task-line))
-            (section-info (match-string 3 task-line)) ; for "Due Today" section
-            (found-section nil)
-            (found-full-task nil))
+            (is-selected (string= (match-string 1 task-line) "X"))
+            (section-info (match-string 3 task-line))) ; for "Due Today" section
         
         ;; Find the original task with metadata
         (dolist (section task-manager-sections)
@@ -971,9 +615,7 @@ otherwise permanently delete them."
                      (stripped-task (string-trim stripped-task)))
                 (when (or (string-match-p (regexp-quote raw-task) stripped-task)
                           (string-match-p (regexp-quote stripped-task) raw-task))
-                  (setq task-found t)
-                  (setq found-section section)
-                  (setq found-full-task full-task)
+                  (setq task-found full-task)
                   (if (member full-task task-manager-selected-tasks)
                       (setq task-manager-selected-tasks 
                             (remove full-task task-manager-selected-tasks))
@@ -991,14 +633,27 @@ otherwise permanently delete them."
                       (setq task-manager-selected-tasks 
                             (remove full-task task-manager-selected-tasks))
                     (push full-task task-manager-selected-tasks))
-                  (setq found-section section-info)
-                  (setq found-full-task full-task)
                   (setq task-found t))))))
         
         ;; Refresh and position cursor
         (when task-found
           (task-manager-save-tasks)
-          (task-manager-refresh)))))
+          (task-manager-refresh)
+          
+          ;; Try to position at the next task (current line + 1)
+          (goto-char (point-min))
+          (forward-line (1- current-line)) ;; Get back to our line
+          
+          ;; Check if there's a next task line (simple check for "[" on next line)
+          (forward-line 1)
+          (let ((next-line (buffer-substring-no-properties 
+                            (line-beginning-position) 
+                            (min (+ (line-beginning-position) 5) (point-max)))))
+            (unless (string-match-p "\\[" next-line)
+              ;; No next task, go back to current task
+              (forward-line -1)))
+          
+          (beginning-of-line))))
     
     (unless task-found
       (message "No task found at point or unable to toggle selection."))))
@@ -1226,10 +881,7 @@ otherwise permanently delete them."
   "Set a task to be recurring. If cursor is on a task, use that task.
 Selecting 'None' will clear recurring status."
   (interactive)
-  (let* ((current-pos (point))
-         (current-line (line-number-at-pos))
-         (current-column (current-column))
-         (task-at-point (task-manager-get-task-at-point))
+  (let* ((task-at-point (task-manager-get-task-at-point))
          (task (if task-at-point
                   (cdr task-at-point)
                 (completing-read "Select task to set as recurring: " (task-manager-all-tasks))))
@@ -1246,45 +898,30 @@ Selecting 'None' will clear recurring status."
                        task-without-recurring
                      (format "%s [Recurring: %s]" task-without-recurring frequency))))
     
-    ;; Remember if we're on this task for cursor positioning
-    (let ((on-updated-task (and task-at-point 
-                              (string= task (cdr task-at-point)))))
-      
-      ;; Replace old task with new one that includes recurring info
-      (when section
-        (setf (gethash section task-manager-tasks)
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      (gethash section task-manager-tasks))))
-      
-      ;; Update selected tasks if needed
-      (when (member task task-manager-selected-tasks)
-        (setq task-manager-selected-tasks
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      task-manager-selected-tasks)))
-      
-      (task-manager-save-tasks)
-      (task-manager-refresh)
-      
-      ;; Restore cursor position
-      (if on-updated-task
-          (task-manager-find-and-position-on-task new-task section)
-        (goto-char (point-min))
-        (forward-line (1- current-line))
-        (move-to-column current-column))
-      
-      (if (string= frequency "None")
-          (message "Recurring status cleared.")
-        (message "Task set as recurring %s." frequency)))))
+    ;; Replace old task with new one that includes recurring info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (if (string= frequency "None")
+        (message "Recurring status cleared.")
+      (message "Task set as recurring %s." frequency))))
 
 (defun task-manager-set-priority ()
   "Set priority for a task. If cursor is on a task, use that task."
   (interactive)
-  (let* ((current-pos (point))
-         (current-line (line-number-at-pos))
-         (current-column (current-column))
-         (task-at-point (task-manager-get-task-at-point))
+  (let* ((task-at-point (task-manager-get-task-at-point))
          (task (if task-at-point
                   (cdr task-at-point)
                 (completing-read "Select task to set priority: " (task-manager-all-tasks))))
@@ -1298,43 +935,28 @@ Selecting 'None' will clear recurring status."
          (task-without-priority (string-trim task-without-priority))
          (new-task (format "%s [Priority: %s]" task-without-priority priority)))
     
-    ;; Remember if we're on this task for cursor positioning
-    (let ((on-updated-task (and task-at-point 
-                              (string= task (cdr task-at-point)))))
-      
-      ;; Replace old task with new one that includes priority info
-      (when section
-        (setf (gethash section task-manager-tasks)
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      (gethash section task-manager-tasks))))
-      
-      ;; Update selected tasks if needed
-      (when (member task task-manager-selected-tasks)
-        (setq task-manager-selected-tasks
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      task-manager-selected-tasks)))
-      
-      (task-manager-save-tasks)
-      (task-manager-refresh)
-      
-      ;; Restore cursor position
-      (if on-updated-task
-          (task-manager-find-and-position-on-task new-task section)
-        (goto-char (point-min))
-        (forward-line (1- current-line))
-        (move-to-column current-column))
-      
-      (message "Priority for task set to %s." priority))))
+    ;; Replace old task with new one that includes priority info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Priority for task set to %s." priority)))
 
 (defun task-manager-set-due-date ()
   "Set or clear a due date for a task. If cursor is on a task, use that task."
   (interactive)
-  (let* ((current-pos (point))
-         (current-line (line-number-at-pos))
-         (current-column (current-column))
-         (task-at-point (task-manager-get-task-at-point))
+  (let* ((task-at-point (task-manager-get-task-at-point))
          (task (if task-at-point
                   (cdr task-at-point)
                 (completing-read "Select task to set due date: " (task-manager-all-tasks))))
@@ -1362,45 +984,30 @@ Selecting 'None' will clear recurring status."
              (task-without-due (string-trim task-without-due)))
         (setq new-task (format "%s [Due: %s]" task-without-due due-date))))
     
-    ;; Remember if we're on this task for cursor positioning
-    (let ((on-updated-task (and task-at-point 
-                              (string= task (cdr task-at-point)))))
-      
-      ;; Replace old task with new one
-      (when section
-        (setf (gethash section task-manager-tasks)
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      (gethash section task-manager-tasks))))
-      
-      ;; Update selected tasks if needed
-      (when (member task task-manager-selected-tasks)
-        (setq task-manager-selected-tasks
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      task-manager-selected-tasks)))
-      
-      (task-manager-save-tasks)
-      (task-manager-refresh)
-      
-      ;; Restore cursor position
-      (if on-updated-task
-          (task-manager-find-and-position-on-task new-task section)
-        (goto-char (point-min))
-        (forward-line (1- current-line))
-        (move-to-column current-column))
-      
-      (if (string= action "Clear date")
-          (message "Due date cleared.")
-        (message "Due date set.")))))
+    ;; Replace old task with new one
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (if (string= action "Clear date")
+        (message "Due date cleared.")
+      (message "Due date set."))))
 
 (defun task-manager-clear-due-date ()
   "Clear the due date from a task at point."
   (interactive)
-  (let* ((current-pos (point))
-         (current-line (line-number-at-pos))
-         (current-column (current-column))
-         (task-at-point (task-manager-get-task-at-point))
+  (let* ((task-at-point (task-manager-get-task-at-point))
          (task (if task-at-point
                   (cdr task-at-point)
                 (completing-read "Select task to clear due date: " (task-manager-all-tasks))))
@@ -1411,35 +1018,23 @@ Selecting 'None' will clear recurring status."
          (new-task (replace-regexp-in-string "\\[Due: [^]]*\\]" "" task))
          (new-task (string-trim new-task)))
     
-    ;; Remember if we're on this task for cursor positioning
-    (let ((on-updated-task (and task-at-point 
-                              (string= task (cdr task-at-point)))))
-      
-      ;; Replace old task with new one
-      (when section
-        (setf (gethash section task-manager-tasks)
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      (gethash section task-manager-tasks))))
-      
-      ;; Update selected tasks if needed
-      (when (member task task-manager-selected-tasks)
-        (setq task-manager-selected-tasks
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      task-manager-selected-tasks)))
-      
-      (task-manager-save-tasks)
-      (task-manager-refresh)
-      
-      ;; Restore cursor position
-      (if on-updated-task
-          (task-manager-find-and-position-on-task new-task section)
-        (goto-char (point-min))
-        (forward-line (1- current-line))
-        (move-to-column current-column))
-      
-      (message "Due date cleared."))))
+    ;; Replace old task with new one
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Due date cleared.")))
 
 (defun task-manager-get-all-tags ()
   "Extract all unique tags from all tasks."
@@ -1458,10 +1053,7 @@ Selecting 'None' will clear recurring status."
   "Add tags to a task. If cursor is on a task, use that task.
 Shows a list of existing tags for selection and offers an option to delete all tags."
   (interactive)
-  (let* ((current-pos (point))
-         (current-line (line-number-at-pos))
-         (current-column (current-column))
-         (task-at-point (task-manager-get-task-at-point))
+  (let* ((task-at-point (task-manager-get-task-at-point))
          (task (if task-at-point
                   (cdr task-at-point)
                 (completing-read "Select task to tag: " (task-manager-all-tasks))))
@@ -1511,68 +1103,28 @@ Shows a list of existing tags for selection and offers an option to delete all t
           (setq new-task task-without-tags)
         (setq new-task (format "%s [Tags: %s]" task-without-tags tags)))))
     
-    ;; Remember if we're on this task for cursor positioning
-    (let ((on-updated-task (and task-at-point 
-                               (string= task (cdr task-at-point)))))
-      
-      ;; Replace old task with new one that includes tags info
-      (when section
-        (setf (gethash section task-manager-tasks)
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      (gethash section task-manager-tasks))))
-      
-      ;; Update selected tasks if needed
-      (when (member task task-manager-selected-tasks)
-        (setq task-manager-selected-tasks
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      task-manager-selected-tasks)))
-      
-      (task-manager-save-tasks)
-      (task-manager-refresh)
-      
-      ;; Restore cursor position
-      (if on-updated-task
-          (task-manager-find-and-position-on-task new-task section)
-        (goto-char (point-min))
-        (forward-line (1- current-line))
-        (move-to-column current-column))
-      
-      (message "Tags updated."))))
-
-(defun task-manager-find-and-position-on-task (task section)
-  "Find TASK in SECTION and position cursor at beginning of line."
-  (goto-char (point-min))
-  (let ((found nil))
-    ;; First find the section
-    (while (and (not found) (< (point) (point-max)))
-      (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-        (when (string-match-p (concat "^" (regexp-quote section) " (") line)
-          (setq found t)
-          (forward-line 1))
-        (unless found
-          (forward-line 1))))
+    ;; Replace old task with new one that includes tags info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
     
-    ;; Now find the task within the section
-    (when found
-      (setq found nil)
-      (while (and (not found) (< (point) (point-max)))
-        (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-          (if (and (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)" line)
-                   (string-match-p (regexp-quote task) line))
-              (setq found t)
-            (forward-line 1))))
-      (when found
-        (beginning-of-line)))))
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Tags updated.")))
 
 (defun task-manager-setting-reminders ()
   "Set reminders for tasks. If cursor is on a task, use that task."
   (interactive)
-  (let* ((current-pos (point))
-         (current-line (line-number-at-pos))
-         (current-column (current-column))
-         (task-at-point (task-manager-get-task-at-point))
+  (let* ((task-at-point (task-manager-get-task-at-point))
          (task (if task-at-point
                   (cdr task-at-point)
                 (completing-read "Select task to set reminder: " (task-manager-all-tasks))))
@@ -1590,35 +1142,23 @@ Shows a list of existing tags for selection and offers an option to delete all t
          (task-without-reminder (string-trim task-without-reminder))
          (new-task (format "%s [Reminder: %s]" task-without-reminder reminder-time)))
     
-    ;; Remember if we're on this task for cursor positioning
-    (let ((on-updated-task (and task-at-point 
-                              (string= task (cdr task-at-point)))))
-      
-      ;; Replace old task with new one that includes reminder info
-      (when section
-        (setf (gethash section task-manager-tasks)
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      (gethash section task-manager-tasks))))
-      
-      ;; Update selected tasks if needed
-      (when (member task task-manager-selected-tasks)
-        (setq task-manager-selected-tasks
-              (mapcar (lambda (t)
-                        (if (string= t task) new-task t))
-                      task-manager-selected-tasks)))
-      
-      (task-manager-save-tasks)
-      (task-manager-refresh)
-      
-      ;; Restore cursor position
-      (if on-updated-task
-          (task-manager-find-and-position-on-task new-task section)
-        (goto-char (point-min))
-        (forward-line (1- current-line))
-        (move-to-column current-column))
-      
-      (message "Reminder for task set at %s." reminder-time))))
+    ;; Replace old task with new one that includes reminder info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Reminder for task set at %s." reminder-time)))
 
 (defun task-manager-filter-tasks ()
   "Filter tasks by priority, due date, or tags."
@@ -1673,14 +1213,10 @@ Shows a list of existing tags for selection and offers an option to delete all t
   "Perform bulk edits on selected tasks."
   (interactive)
   (when task-manager-selected-tasks
-    (let* ((current-pos (point))
-           (current-line (line-number-at-pos))
-           (current-column (current-column))
-           (action (completing-read "Bulk action: " 
+    (let* ((action (completing-read "Bulk action: " 
                                     '("add tag" "set priority" "set due date" 
                                       "set reminder" "mark as recurring")))
-           (value (read-string (format "Enter %s value: " action)))
-           (updated-tasks nil))
+           (value (read-string (format "Enter %s value: " action))))
       (dolist (task task-manager-selected-tasks)
         (let ((new-task (format "%s [%s: %s]" task
                                 (cond
@@ -1690,7 +1226,6 @@ Shows a list of existing tags for selection and offers an option to delete all t
                                  ((string= action "set reminder") "Reminder")
                                  ((string= action "mark as recurring") "Recurring"))
                                 value)))
-          (push (cons task new-task) updated-tasks)
           ;; Replace old task with new one that includes the new info
           (dolist (section task-manager-sections)
             (let ((tasks (gethash section task-manager-tasks)))
@@ -1699,22 +1234,8 @@ Shows a list of existing tags for selection and offers an option to delete all t
                       (mapcar (lambda (t)
                                 (if (string= t task) new-task t))
                               tasks)))))))
-      
-      ;; Update selected tasks list with new task text
-      (setq task-manager-selected-tasks
-            (mapcar (lambda (task)
-                      (let ((updated (assoc task updated-tasks)))
-                        (if updated (cdr updated) task)))
-                    task-manager-selected-tasks))
-      
       (task-manager-save-tasks)
       (task-manager-refresh)
-      
-      ;; Try to restore cursor position
-      (goto-char (point-min))
-      (forward-line (1- current-line))
-      (move-to-column current-column)
-      
       (message "Bulk edited %d tasks." (length task-manager-selected-tasks)))))
 
 (defun task-manager-export ()
@@ -2185,73 +1706,6 @@ Shows a list of existing tags for selection and offers an option to delete all t
     ;; If found, position cursor at beginning of line
     (when found
       (beginning-of-line))))
-
-;; Add the missing toggle section function
-(defun task-manager-toggle-section-at-point ()
-  "Toggle the expansion state of the section at point."
-  (interactive)
-  (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-    (dolist (section task-manager-sections)
-      (when (string-match-p (concat "^" (regexp-quote section) " (") line)
-        (let ((current-state (gethash section task-manager-expanded-sections)))
-          (puthash section (not current-state) task-manager-expanded-sections)
-          (message "%s section %s" 
-                   section 
-                   (if (not current-state) "expanded" "collapsed"))
-          (task-manager-refresh))))))
-
-;; Add this debugging function before the provide statement
-(defun task-manager-debug-tasks ()
-  "Display the contents of the task-manager-tasks hash table for debugging."
-  (interactive)
-  (let ((debug-buffer (get-buffer-create "*Task Manager Debug*")))
-    (with-current-buffer debug-buffer
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert "Task Manager Data Structure Contents:\n\n")
-        
-        ;; Show hash table stats
-        (insert (format "Hash table stats: %d sections, %s\n\n" 
-                       (length task-manager-sections)
-                       (if (hash-table-p task-manager-tasks)
-                           (format "%d entries, test: %s" 
-                                  (hash-table-count task-manager-tasks)
-                                  (hash-table-test task-manager-tasks))
-                         "NOT A VALID HASH TABLE")))
-        
-        ;; Show expanded sections state
-        (insert "Section expansion state:\n")
-        (dolist (section task-manager-sections)
-          (insert (format "  %s: %s\n" section 
-                         (if (gethash section task-manager-expanded-sections)
-                             "expanded" "collapsed"))))
-        (insert "\n")
-        
-        ;; Show tasks by section
-        (insert "Tasks by section:\n")
-        (dolist (section task-manager-sections)
-          (let ((tasks (gethash section task-manager-tasks)))
-            (insert (format "  %s (%d tasks):\n" section (length tasks)))
-            (if tasks
-                (dolist (task tasks)
-                  (insert (format "    - %s\n" task)))
-              (insert "    (empty)\n"))
-            (insert "\n"))))
-      
-      ;; Set up the buffer for viewing
-      (special-mode)
-      (local-set-key (kbd "q") 'kill-this-buffer)
-      (local-set-key (kbd "g") 
-                    (lambda () 
-                      (interactive)
-                      (task-manager-debug-tasks))))
-    
-    ;; Show the debug buffer
-    (switch-to-buffer debug-buffer)
-    (message "Showing task manager internal data structure for debugging")))
-
-;; Add key binding for debug function
-(define-key task-manager-mode-map (kbd "M-d") 'task-manager-debug-tasks)
 
 (provide 'task-manager2)
 
