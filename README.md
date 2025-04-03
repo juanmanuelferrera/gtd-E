@@ -1,5 +1,4 @@
-[https://github.com/user-attachments/assets/2a5de148-2323-45bd-b1ee-f6066945a82c
-](https://www.youtube.com/watch?v=hkASOXd7orA)
+https://github.com/user-attachments/assets/570b6db3-cc56-4ca6-95c1-604e94060a6b
 
 # GTD + Emacs · Task Manager
 
