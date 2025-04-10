@@ -9,42 +9,57 @@
 ;; A comprehensive task manager with sections for Inbox, Today, Week, etc.
 ;; Added functionalities: search, recurring tasks, priorities, reminders, tags, and export/import.
 ;; 
-;; Key commands:
-;;  a: Add a single task
-;;  A: Add multiple tasks
-;;  k: Delete selected tasks (move to Archive)
-;;  K: Delete all tasks in a section
-;;  m: Move selected tasks to another section
-;;  RET: Edit task at current position
-;;  z: Toggle expansion of all sections
-;;  S: Search tasks
-;;  s: Focus on Someday section
-;;  r: Set task as recurring (daily, weekly, monthly)
-;;  R: Clear recurring status
-;;  V: View all recurring tasks
-;;  F: Focus on Archive section
-;;  p: Move to previous task
-;;  n: Move to next task
-;;  d: Set due date
-;;  D: Clear due date
-;;  T: Add tags
-;;  t: Focus on Today section
-;;  w: Focus on Week section
-;;  W: Move all tasks from Inbox and Today to Week
-;;  o: Focus on Monday section
+Commands:
+;;  a i: Add task to Inbox
+;;  a t: Add task to Today
+;;  a w: Add task to Week
+;;  a m: Add task to Monday
+;;  a s: Add task to Someday
+;;  a c: Add task to Calendar
+;;  A i: Add multiple tasks to Inbox
+;;  A t: Add multiple tasks to Today
+;;  A w: Add multiple tasks to Week
+;;  A m: Add multiple tasks to Monday
+;;  A s: Add multiple tasks to Someday
+;;  A c: Add multiple tasks to Calendar
+;;  b: Bulk edit tasks
+;;  B: Create manual backup
 ;;  c: Focus on Calendar section
 ;;  C: Toggle commands visibility
-;;  f: Filter tasks by properties
-;;  X: Set reminders
-;;  b: Bulk edit selected tasks
-;;  x: Export tasks (org, json, csv)
-;;  I: Import tasks
+;;  d: Set due date
+;;  D: Clear due date
+;;  f: Filter tasks
+;;  g: Refresh buffer
 ;;  i: Focus on Inbox section
-;;  v: Save tasks
+;;  I: Import tasks
+;;  k: Delete task
+;;  K: Delete all tasks in a section
 ;;  L: Load tasks
+;;  m: Focus on Monday section
+;;  n: Move to next task
+;;  o i: Open Inbox section
+;;  o t: Open Today section
+;;  o w: Open Week section
+;;  o m: Open Monday section
+;;  o s: Open Someday section
+;;  o c: Open Calendar section
+;;  p: Move to previous task
+;;  q: Quit buffer
+;;  r: Set recurring task
+;;  R: Clear recurring status
+;;  s: Move task to Someday
+;;  S: Search tasks
+;;  t: Focus on Today section
+;;  T: Add/delete tags
+;;  u: Undo
+;;  v: View all recurring tasks
+;;  w: Move task to Week
+;;  W: Move all Inbox and Today tasks to Week
+;;  x: Export tasks
+;;  X: Set reminders
+;;  z: Collapse/expand all sections
+;;  RET: Edit task
 ;;  SPC: Toggle task selection
-;;  u: Undo (up to 15 operations)
-;;  n: Next task
 ;; 
 ;; Features:
 ;;  - URLs and file paths in tasks are automatically clickable
@@ -224,39 +239,73 @@
   "Major mode for task management."
   (buffer-disable-undo)
   (setq buffer-read-only t)
-  ;; Set up key bindings
-  (define-key task-manager-mode-map (kbd "a") 'task-manager-add-task)
-  (define-key task-manager-mode-map (kbd "A") 'task-manager-add-multiple-tasks)
-  (define-key task-manager-mode-map (kbd "k") 'task-manager-delete-tasks)
-  (define-key task-manager-mode-map (kbd "K") 'task-manager-delete-section-tasks)
-  (define-key task-manager-mode-map (kbd "m") 'task-manager-move-tasks)
+  
+  ;; Create prefix keymaps for 'a', 'A', and 'o'
+  (let ((a-map (make-sparse-keymap))
+        (A-map (make-sparse-keymap))
+        (o-map (make-sparse-keymap)))
+    
+    ;; Define keys in the 'a' prefix map
+    (define-key a-map (kbd "i") 'task-manager-add-task-inbox)
+    (define-key a-map (kbd "t") 'task-manager-add-task-today)
+    (define-key a-map (kbd "w") 'task-manager-add-task-week)
+    (define-key a-map (kbd "m") 'task-manager-add-task-monday)
+    (define-key a-map (kbd "s") 'task-manager-add-task-someday)
+    (define-key a-map (kbd "c") 'task-manager-add-task-calendar)
+    
+    ;; Define keys in the 'A' prefix map
+    (define-key A-map (kbd "i") 'task-manager-add-multiple-tasks-inbox)
+    (define-key A-map (kbd "t") 'task-manager-add-multiple-tasks-today)
+    (define-key A-map (kbd "w") 'task-manager-add-multiple-tasks-week)
+    (define-key A-map (kbd "m") 'task-manager-add-multiple-tasks-monday)
+    (define-key A-map (kbd "s") 'task-manager-add-multiple-tasks-someday)
+    (define-key A-map (kbd "c") 'task-manager-add-multiple-tasks-calendar)
+    
+    ;; Define keys in the 'o' prefix map
+    (define-key o-map (kbd "i") 'task-manager-focus-inbox)
+    (define-key o-map (kbd "t") 'task-manager-focus-today)
+    (define-key o-map (kbd "w") 'task-manager-focus-week)
+    (define-key o-map (kbd "m") 'task-manager-focus-monday)
+    (define-key o-map (kbd "s") 'task-manager-focus-someday)
+    (define-key o-map (kbd "c") 'task-manager-focus-calendar)
+    
+    ;; Bind the prefix maps to 'a', 'A', and 'o'
+    (define-key task-manager-mode-map (kbd "a") a-map)
+    (define-key task-manager-mode-map (kbd "A") A-map)
+    (define-key task-manager-mode-map (kbd "o") o-map))
+  
+  ;; Set up other key bindings
   (define-key task-manager-mode-map (kbd "RET") 'task-manager-edit-task-at-point)
-  (define-key task-manager-mode-map (kbd "z") 'task-manager-toggle-all-sections)
-  (define-key task-manager-mode-map (kbd "S") 'task-manager-search-tasks)
-  (define-key task-manager-mode-map (kbd "s") 'task-manager-focus-someday)
-  (define-key task-manager-mode-map (kbd "r") 'task-manager-set-recurring)
-  (define-key task-manager-mode-map (kbd "R") 'task-manager-clear-recurring)
-  (define-key task-manager-mode-map (kbd "V") 'task-manager-view-recurring)
-  (define-key task-manager-mode-map (kbd "F") 'task-manager-focus-archive)
-  (define-key task-manager-mode-map (kbd "p") 'task-manager-previous-task)
-  (define-key task-manager-mode-map (kbd "n") 'task-manager-next-task)
+  (define-key task-manager-mode-map (kbd "b") 'task-manager-bulk-edit)
+  (define-key task-manager-mode-map (kbd "B") 'task-manager-manual-backup)
+  (define-key task-manager-mode-map (kbd "c") 'task-manager-move-to-calendar)
+  (define-key task-manager-mode-map (kbd "C") 'task-manager-toggle-commands)
   (define-key task-manager-mode-map (kbd "d") 'task-manager-set-due-date)
   (define-key task-manager-mode-map (kbd "D") 'task-manager-clear-due-date)
-  (define-key task-manager-mode-map (kbd "T") 'task-manager-add-tags)
-  (define-key task-manager-mode-map (kbd "t") 'task-manager-focus-today)
-  (define-key task-manager-mode-map (kbd "w") 'task-manager-focus-week)
-  (define-key task-manager-mode-map (kbd "W") 'task-manager-move-to-week)
-  (define-key task-manager-mode-map (kbd "o") 'task-manager-focus-monday)
-  (define-key task-manager-mode-map (kbd "c") 'task-manager-focus-calendar)
-  (define-key task-manager-mode-map (kbd "C") 'task-manager-toggle-commands)
   (define-key task-manager-mode-map (kbd "f") 'task-manager-filter-tasks)
-  (define-key task-manager-mode-map (kbd "X") 'task-manager-setting-reminders)
-  (define-key task-manager-mode-map (kbd "b") 'task-manager-bulk-edit)
-  (define-key task-manager-mode-map (kbd "x") 'task-manager-export)
+  (define-key task-manager-mode-map (kbd "g") 'task-manager-refresh)
+  (define-key task-manager-mode-map (kbd "i") 'task-manager-move-to-inbox)
   (define-key task-manager-mode-map (kbd "I") 'task-manager-import)
-  (define-key task-manager-mode-map (kbd "i") 'task-manager-focus-inbox)
-  (define-key task-manager-mode-map (kbd "v") 'task-manager-save-tasks)
+  (define-key task-manager-mode-map (kbd "k") 'task-manager-delete-tasks)
+  (define-key task-manager-mode-map (kbd "K") 'task-manager-delete-section-tasks)
   (define-key task-manager-mode-map (kbd "L") 'task-manager-load-tasks)
+  (define-key task-manager-mode-map (kbd "m") 'task-manager-move-to-monday)
+  (define-key task-manager-mode-map (kbd "n") 'task-manager-next-task)
+  (define-key task-manager-mode-map (kbd "p") 'task-manager-previous-task)
+  (define-key task-manager-mode-map (kbd "q") 'kill-this-buffer)
+  (define-key task-manager-mode-map (kbd "r") 'task-manager-set-recurring)
+  (define-key task-manager-mode-map (kbd "R") 'task-manager-clear-recurring)
+  (define-key task-manager-mode-map (kbd "s") 'task-manager-move-to-someday)
+  (define-key task-manager-mode-map (kbd "S") 'task-manager-search-tasks)
+  (define-key task-manager-mode-map (kbd "t") 'task-manager-move-to-today)
+  (define-key task-manager-mode-map (kbd "T") 'task-manager-add-tags)
+  (define-key task-manager-mode-map (kbd "u") 'task-manager-undo)
+  (define-key task-manager-mode-map (kbd "v") 'task-manager-view-recurring)
+  (define-key task-manager-mode-map (kbd "w") 'task-manager-move-to-week)
+  (define-key task-manager-mode-map (kbd "W") 'task-manager-move-all-to-week)
+  (define-key task-manager-mode-map (kbd "x") 'task-manager-export)
+  (define-key task-manager-mode-map (kbd "X") 'task-manager-setting-reminders)
+  (define-key task-manager-mode-map (kbd "z") 'task-manager-toggle-all-sections)
   (define-key task-manager-mode-map (kbd "SPC") 'task-manager-toggle-task-at-point))
 
 ;; Add the undo keybinding explicitly after mode definition
@@ -267,6 +316,99 @@
 
 ;; Add the next task keybinding
 (define-key task-manager-mode-map (kbd "n") 'task-manager-next-task)
+
+;; Add key binding for manual backup
+(define-key task-manager-mode-map (kbd "B") 'task-manager-manual-backup)
+
+;; Add new functions for section-specific task addition
+(defun task-manager-add-task-inbox ()
+  "Add a task to the Inbox section."
+  (interactive)
+  (task-manager-add-task "Inbox"))
+
+(defun task-manager-add-task-today ()
+  "Add a task to the Today section."
+  (interactive)
+  (task-manager-add-task "Today"))
+
+(defun task-manager-add-task-week ()
+  "Add a task to the Week section."
+  (interactive)
+  (task-manager-add-task "Week"))
+
+(defun task-manager-add-task-monday ()
+  "Add a task to the Monday section."
+  (interactive)
+  (task-manager-add-task "Monday"))
+
+(defun task-manager-add-task-someday ()
+  "Add a task to the Someday section."
+  (interactive)
+  (task-manager-add-task "Someday"))
+
+(defun task-manager-add-task-calendar ()
+  "Add a task to the Calendar section."
+  (interactive)
+  (task-manager-add-task "Calendar"))
+
+(defun task-manager-add-multiple-tasks-inbox ()
+  "Add multiple tasks to the Inbox section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Inbox"))
+
+(defun task-manager-add-multiple-tasks-today ()
+  "Add multiple tasks to the Today section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Today"))
+
+(defun task-manager-add-multiple-tasks-week ()
+  "Add multiple tasks to the Week section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Week"))
+
+(defun task-manager-add-multiple-tasks-monday ()
+  "Add multiple tasks to the Monday section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Monday"))
+
+(defun task-manager-add-multiple-tasks-someday ()
+  "Add multiple tasks to the Someday section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Someday"))
+
+(defun task-manager-add-multiple-tasks-calendar ()
+  "Add multiple tasks to the Calendar section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Calendar"))
+
+(defun task-manager-move-to-someday ()
+  "Move selected tasks to Someday section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Someday" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Someday." (length tasks-to-move)))))
 
 (defun task-manager-toggle-commands ()
   "Toggle the visibility of the commands section."
@@ -327,10 +469,13 @@
 (defun task-manager-refresh ()
   "Refresh the display of tasks in the task manager."
   (let ((inhibit-read-only t)
-        (today (format-time-string "%Y-%m-%d")))
+        (today (format-time-string "%Y-%m-%d"))
+        (current-date (format-time-string "%A, %d %B %Y"))
+        (current-time (format-time-string "%H:%M")))
     (erase-buffer)
     (insert "GTD + Emacs\n")
-    (insert "============\n\n")
+    (insert "============\n")
+    (insert (format "%s [%s]\n\n" current-date current-time))
     
     ;; Display tasks due today at the top
     (insert (propertize "Due Today" 'face '(:inherit font-lock-keyword-face :weight bold)))
@@ -423,40 +568,55 @@
     (if task-manager-show-commands
         (progn
           (insert "\nCommands:\n")
-          (insert "  a: Add a single task (press i,t,w,o,c,s for section)\n")
-          (insert "  A: Add multiple tasks\n")
-          (insert "  k: Delete selected tasks (move to Archive)\n")
-          (insert "  K: Delete all tasks in a section\n")
-          (insert "  m: Move selected tasks (press i,t,w,o,c,s for section)\n")
-          (insert "  RET: Edit task\n")
-          (insert "  z: Expand/collapse all sections\n")
-          (insert "  S: Search tasks\n")
-          (insert "  s: Focus on Someday section\n")
-          (insert "  r: Set recurring task\n")
-          (insert "  R: Clear recurring status\n")
-          (insert "  V: View all recurring tasks\n")
-          (insert "  F: Focus on Archive section\n")
-          (insert "  p: Move to previous task\n")
-          (insert "  n: Move to next task\n")
-          (insert "  d: Set due date\n")
-          (insert "  D: Clear due date\n")
-          (insert "  T: Add tags\n")
-          (insert "  t: Focus on Today section\n")
-          (insert "  w: Focus on Week section\n")
-          (insert "  W: Move all tasks from Inbox and Today to Week\n")
-          (insert "  o: Focus on Monday section\n")
+          (insert "  a i: Add task to Inbox\n")
+          (insert "  a t: Add task to Today\n")
+          (insert "  a w: Add task to Week\n")
+          (insert "  a m: Add task to Monday\n")
+          (insert "  a s: Add task to Someday\n")
+          (insert "  a c: Add task to Calendar\n")
+          (insert "  A i: Add multiple tasks to Inbox\n")
+          (insert "  A t: Add multiple tasks to Today\n")
+          (insert "  A w: Add multiple tasks to Week\n")
+          (insert "  A m: Add multiple tasks to Monday\n")
+          (insert "  A s: Add multiple tasks to Someday\n")
+          (insert "  A c: Add multiple tasks to Calendar\n")
+          (insert "  b: Bulk edit tasks\n")
+          (insert "  B: Create manual backup\n")
           (insert "  c: Focus on Calendar section\n")
           (insert "  C: Toggle commands visibility\n")
+          (insert "  d: Set due date\n")
+          (insert "  D: Clear due date\n")
           (insert "  f: Filter tasks\n")
-          (insert "  X: Set reminders\n")
-          (insert "  b: Bulk edit tasks\n")
-          (insert "  x: Export tasks\n")
+          (insert "  g: Refresh buffer\n")
           (insert "  i: Focus on Inbox section\n")
           (insert "  I: Import tasks\n")
-          (insert "  v: Save tasks\n")
+          (insert "  k: Delete task\n")
+          (insert "  K: Delete all tasks in a section\n")
           (insert "  L: Load tasks\n")
-          (insert "  u: Undo (up to 15 operations)\n")
-          (insert "  B: Create manual backup\n")
+          (insert "  m: Focus on Monday section\n")
+          (insert "  n: Move to next task\n")
+          (insert "  o i: Open Inbox section\n")
+          (insert "  o t: Open Today section\n")
+          (insert "  o w: Open Week section\n")
+          (insert "  o m: Open Monday section\n")
+          (insert "  o s: Open Someday section\n")
+          (insert "  o c: Open Calendar section\n")
+          (insert "  p: Move to previous task\n")
+          (insert "  q: Quit buffer\n")
+          (insert "  r: Set recurring task\n")
+          (insert "  R: Clear recurring status\n")
+          (insert "  s: Move task to Someday\n")
+          (insert "  S: Search tasks\n")
+          (insert "  t: Focus on Today section\n")
+          (insert "  T: Add/delete tags\n")
+          (insert "  u: Undo\n")
+          (insert "  v: View all recurring tasks\n")
+          (insert "  w: Move task to Week\n")
+          (insert "  W: Move all Inbox and Today tasks to Week\n")
+          (insert "  x: Export tasks\n")
+          (insert "  X: Set reminders\n")
+          (insert "  z: Collapse/expand all sections\n")
+          (insert "  RET: Edit task\n")
           (insert "  SPC: Toggle task selection\n"))
       ;; Show reminder when commands are hidden
       (insert "\nC to show commands\n"))
@@ -1713,6 +1873,199 @@ Shows a list of existing tags for selection and offers an option to delete all t
       (beginning-of-line))))
 
 (defun task-manager-move-to-week ()
+  "Move selected tasks to Week section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Week" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Week." (length tasks-to-move)))))
+
+;; Function to manually create a backup
+(defun task-manager-manual-backup ()
+  "Manually create a backup of the tasks.org file."
+  (interactive)
+  (task-manager-create-backup)
+  (message "Manual backup created."))
+
+;; Setup a timer for periodic backups
+(defvar task-manager-backup-timer nil
+  "Timer object for automatic backups.")
+
+(defun task-manager-start-backup-timer ()
+  "Start the backup timer."
+  (when task-manager-backup-timer
+    (cancel-timer task-manager-backup-timer))
+  (setq task-manager-backup-timer
+        (run-with-timer 
+         task-manager-backup-interval 
+         task-manager-backup-interval 
+         'task-manager-backup-if-needed)))
+
+;; Start the backup timer when the package is loaded
+(eval-after-load 'task-manager2
+  '(task-manager-start-backup-timer))
+
+(defun task-manager-next-task ()
+  "Move to the next task in the buffer."
+  (interactive)
+  (let ((current-pos (point))
+        (found nil))
+    ;; Move down one line to start searching from the line below current position
+    (forward-line 1)
+    ;; Search forward for a task line (which will have a checkbox)
+    (while (and (not found) (not (eobp)))
+      (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+        (if (string-match-p "^\\s-*\\[\\([X ]\\)\\]" line)
+            (setq found t)
+          (forward-line 1))))
+    
+    ;; If no task found below, go back to original position
+    (unless found
+      (goto-char current-pos)
+      (message "No next task found"))
+    
+    ;; If found, position cursor at beginning of line
+    (when found
+      (beginning-of-line))))
+
+(defun task-manager-move-to-today ()
+  "Move selected tasks to Today section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Today" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Today." (length tasks-to-move)))))
+
+(defun task-manager-move-to-inbox ()
+  "Move selected tasks to Inbox section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Inbox" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Inbox." (length tasks-to-move)))))
+
+(defun task-manager-move-to-monday ()
+  "Move selected tasks to Monday section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Monday" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Monday." (length tasks-to-move)))))
+
+(defun task-manager-move-to-calendar ()
+  "Move selected tasks to Calendar section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Calendar" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Calendar." (length tasks-to-move)))))
+
+(defun task-manager-move-all-to-week ()
   "Move all tasks from Inbox and Today sections to Week section."
   (interactive)
   (let ((inbox-tasks (gethash "Inbox" task-manager-tasks))
@@ -1752,57 +2105,6 @@ Shows a list of existing tags for selection and offers an option to delete all t
     (forward-line 1)
     
     (message "Moved %d tasks from Inbox and Today to Week." count)))
-
-;; Function to manually create a backup
-(defun task-manager-manual-backup ()
-  "Manually create a backup of the tasks.org file."
-  (interactive)
-  (task-manager-create-backup)
-  (message "Manual backup created."))
-
-;; Setup a timer for periodic backups
-(defvar task-manager-backup-timer nil
-  "Timer object for automatic backups.")
-
-(defun task-manager-start-backup-timer ()
-  "Start the backup timer."
-  (when task-manager-backup-timer
-    (cancel-timer task-manager-backup-timer))
-  (setq task-manager-backup-timer
-        (run-with-timer 
-         task-manager-backup-interval 
-         task-manager-backup-interval 
-         'task-manager-backup-if-needed)))
-
-;; Start the backup timer when the package is loaded
-(eval-after-load 'task-manager2
-  '(task-manager-start-backup-timer))
-
-;; Add key binding for manual backup
-(define-key task-manager-mode-map (kbd "B") 'task-manager-manual-backup)
-
-(defun task-manager-next-task ()
-  "Move to the next task in the buffer."
-  (interactive)
-  (let ((current-pos (point))
-        (found nil))
-    ;; Move down one line to start searching from the line below current position
-    (forward-line 1)
-    ;; Search forward for a task line (which will have a checkbox)
-    (while (and (not found) (not (eobp)))
-      (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-        (if (string-match-p "^\\s-*\\[\\([X ]\\)\\]" line)
-            (setq found t)
-          (forward-line 1))))
-    
-    ;; If no task found below, go back to original position
-    (unless found
-      (goto-char current-pos)
-      (message "No next task found"))
-    
-    ;; If found, position cursor at beginning of line
-    (when found
-      (beginning-of-line))))
 
 (provide 'task-manager2)
 
