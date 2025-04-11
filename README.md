@@ -1,4 +1,4 @@
-https://github.com/user-attachments/assets/570b6db3-cc56-4ca6-95c1-604e94060a6b
+https://github.com/user-attachments/assets/a0de2d64-24c0-4ccc-bdc8-683664a985bb
 
 # GTD + Emacs · Task Manager
 
