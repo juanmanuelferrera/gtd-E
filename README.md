@@ -2,7 +2,7 @@ https://github.com/user-attachments/assets/a0de2d64-24c0-4ccc-bdc8-683664a985bb
 
 # GTD + Emacs · Task Manager
 
-A powerful, self-contained task management application for Emacs that organizes tasks into six distinct sections: Inbox, Today, Monday, Month, Calendar, and Someday. This task manager is based on the GTD+R (Getting Things Done + Rodhia) methodology by Kenji Ohta, which combines David Allen's GTD principles with a structured review system.
+A powerful, self-contained task management application for Emacs that organizes tasks into six distinct sections: Inbox, Today, Monday, Month, Calendar, and Someday. This task manager is based on the GTD+R (Getting Things Done + Rodhia) methodology by Kenji Ohta, https://gtd-r.blogspot.com/ which combines David Allen's GTD principles with a structured review system.
 
 ## GTD+R Methodology
 
