@@ -99,12 +99,6 @@ M-x task-manager2-init
 - `o s`: Open Someday section
 - `o c`: Open Calendar section
 - `o a`: Open Archive section
-- `i`: Focus on Inbox section
-- `t`: Focus on Today section
-- `w`: Focus on Week section
-- `m`: Focus on Monday section
-- `s`: Focus on Someday section
-- `c`: Focus on Calendar section
 - `n`: Move to next task
 - `p`: Move to previous task
 
