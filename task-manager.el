@@ -9,60 +9,50 @@
 ;; A comprehensive task manager with sections for Inbox, Today, Week, etc.
 ;; Added functionalities: search, recurring tasks, priorities, reminders, tags, and export/import.
 ;; 
-Commands:
-;;  a i: Add task to Inbox
-;;  a t: Add task to Today
-;;  a w: Add task to Week
-;;  a m: Add task to Monday
-;;  a s: Add task to Someday
-;;  a c: Add task to Calendar
-;;  A i: Add multiple tasks to Inbox
-;;  A t: Add multiple tasks to Today
-;;  A w: Add multiple tasks to Week
-;;  A m: Add multiple tasks to Monday
-;;  A s: Add multiple tasks to Someday
-;;  A c: Add multiple tasks to Calendar
-;;  b: Bulk edit tasks
-;;  B: Create manual backup
-;;  c: Focus on Calendar section
-;;  C: Toggle commands visibility
+;; Key commands:
+;;  a: Add a single task
+;;  A: Add multiple tasks
+;;  k: Delete selected tasks (move to Archive)
+;;  K: Delete all tasks in a section
+;;  l: Duplicate task at cursor
+;;  L: Load tasks
+;;  m: Move selected tasks to another section
+;;  RET: Edit task at current position
+;;  z: Toggle expansion of all sections
+;;  S: Search tasks
+;;  s: Focus on Someday section
+;;  r: Set task as recurring (daily, weekly, monthly)
+;;  R: Clear recurring status
+;;  V: View all recurring tasks
+;;  F: Focus on Archive section
+;;  p: Move to previous task
+;;  n: Move to next task
 ;;  d: Set due date
 ;;  D: Clear due date
-;;  f: Filter tasks
-;;  g: Refresh buffer
-;;  i: Focus on Inbox section
-;;  I: Import tasks
-;;  k: Delete task
-;;  K: Delete all tasks in a section
-;;  L: Load tasks
-;;  m: Focus on Monday section
-;;  n: Move to next task
-;;  o i: Open Inbox section
-;;  o t: Open Today section
-;;  o w: Open Week section
-;;  o m: Open Monday section
-;;  o s: Open Someday section
-;;  o c: Open Calendar section
-;;  p: Move to previous task
-;;  q: Quit buffer
-;;  r: Set recurring task
-;;  R: Clear recurring status
-;;  s: Move task to Someday
-;;  S: Search tasks
+;;  T: Add tags
 ;;  t: Focus on Today section
-;;  T: Add/delete tags
-;;  u: Undo
-;;  v: View all recurring tasks
-;;  w: Move task to Week
-;;  W: Move all Inbox and Today tasks to Week
-;;  x: Export tasks
+;;  w: Move task to Week section
+;;  W: Move all tasks from Inbox and Today to Week
+;;  o: Focus on Monday section
+;;  c: Focus on Calendar section
+;;  C: Toggle commands visibility
+;;  f: Filter tasks by properties
 ;;  X: Set reminders
-;;  z: Collapse/expand all sections
-;;  RET: Edit task
+;;  b: Bulk edit tasks
+;;  E: Export tasks (org, json, csv)
+;;  I: Import tasks
+;;  i: Focus on Inbox section
+;;  v: Save tasks
+;;  L: Load tasks
 ;;  SPC: Toggle task selection
+;;  u: Undo (up to 15 operations)
+;;  n: Next task
+;;  O: Import tasks from org-agenda in a directory
 ;; 
 ;; Features:
 ;;  - URLs and file paths in tasks are automatically clickable
+;;  - Automatic daily task migration from Today to Week at 3 AM
+;;  - Import tasks from org-agenda in a directory
 ;; 
 ;; To start: M-x task-manager2-init
 
@@ -216,24 +206,17 @@ Commands:
 (defun task-manager2-init ()
   "Initialize the task manager."
   (interactive)
-  ;; Initialize sections in hash table if needed
+  (switch-to-buffer (get-buffer-create "*Task Manager*"))
+  (task-manager-mode)
+  (task-manager-load-tasks)
+  (task-manager-check-overdue-migration)
+  
+  ;; Initialize all sections as expanded
   (dolist (section task-manager-sections)
-    (unless (gethash section task-manager-tasks)
-      (puthash section '() task-manager-tasks)
-      (puthash section t task-manager-expanded-sections)))
+    (puthash section t task-manager-expanded-sections))
   
-  ;; Try to load existing tasks
-  (when (fboundp 'task-manager-load-tasks)
-    (task-manager-load-tasks))
-  
-  ;; Open buffer
-  (let ((buffer (get-buffer-create "*Task Manager*")))
-    (with-current-buffer buffer
-      (task-manager-mode)
-      ;; Ensure commands are hidden on startup
-      (setq-local task-manager-show-commands nil)
-      (task-manager-refresh))
-    (switch-to-buffer buffer)))
+  (task-manager-refresh)
+  (task-manager-schedule-auto-migrate))
 
 (define-derived-mode task-manager-mode special-mode "Task Manager"
   "Major mode for task management."
@@ -268,6 +251,7 @@ Commands:
     (define-key o-map (kbd "m") 'task-manager-focus-monday)
     (define-key o-map (kbd "s") 'task-manager-focus-someday)
     (define-key o-map (kbd "c") 'task-manager-focus-calendar)
+    (define-key o-map (kbd "a") 'task-manager-focus-archive)
     
     ;; Bind the prefix maps to 'a', 'A', and 'o'
     (define-key task-manager-mode-map (kbd "a") a-map)
@@ -282,12 +266,14 @@ Commands:
   (define-key task-manager-mode-map (kbd "C") 'task-manager-toggle-commands)
   (define-key task-manager-mode-map (kbd "d") 'task-manager-set-due-date)
   (define-key task-manager-mode-map (kbd "D") 'task-manager-clear-due-date)
+  (define-key task-manager-mode-map (kbd "E") 'task-manager-export)
   (define-key task-manager-mode-map (kbd "f") 'task-manager-filter-tasks)
   (define-key task-manager-mode-map (kbd "g") 'task-manager-refresh)
   (define-key task-manager-mode-map (kbd "i") 'task-manager-move-to-inbox)
   (define-key task-manager-mode-map (kbd "I") 'task-manager-import)
   (define-key task-manager-mode-map (kbd "k") 'task-manager-delete-tasks)
   (define-key task-manager-mode-map (kbd "K") 'task-manager-delete-section-tasks)
+  (define-key task-manager-mode-map (kbd "l") 'task-manager-duplicate-task)
   (define-key task-manager-mode-map (kbd "L") 'task-manager-load-tasks)
   (define-key task-manager-mode-map (kbd "m") 'task-manager-move-to-monday)
   (define-key task-manager-mode-map (kbd "n") 'task-manager-next-task)
@@ -305,7 +291,7 @@ Commands:
   (define-key task-manager-mode-map (kbd "W") 'task-manager-move-all-to-week)
   (define-key task-manager-mode-map (kbd "x") 'task-manager-export)
   (define-key task-manager-mode-map (kbd "X") 'task-manager-setting-reminders)
-  (define-key task-manager-mode-map (kbd "z") 'task-manager-toggle-all-sections)
+  (define-key task-manager-mode-map (kbd "z") 'task-manager-collapse-all-sections)
   (define-key task-manager-mode-map (kbd "SPC") 'task-manager-toggle-task-at-point))
 
 ;; Add the undo keybinding explicitly after mode definition
@@ -586,12 +572,14 @@ Commands:
           (insert "  C: Toggle commands visibility\n")
           (insert "  d: Set due date\n")
           (insert "  D: Clear due date\n")
+          (insert "  E: Export tasks\n")
           (insert "  f: Filter tasks\n")
           (insert "  g: Refresh buffer\n")
           (insert "  i: Focus on Inbox section\n")
           (insert "  I: Import tasks\n")
           (insert "  k: Delete task\n")
           (insert "  K: Delete all tasks in a section\n")
+          (insert "  l: Duplicate task at cursor\n")
           (insert "  L: Load tasks\n")
           (insert "  m: Focus on Monday section\n")
           (insert "  n: Move to next task\n")
@@ -601,6 +589,7 @@ Commands:
           (insert "  o m: Open Monday section\n")
           (insert "  o s: Open Someday section\n")
           (insert "  o c: Open Calendar section\n")
+          (insert "  o a: Open Archive section\n")
           (insert "  p: Move to previous task\n")
           (insert "  q: Quit buffer\n")
           (insert "  r: Set recurring task\n")
@@ -613,7 +602,6 @@ Commands:
           (insert "  v: View all recurring tasks\n")
           (insert "  w: Move task to Week\n")
           (insert "  W: Move all Inbox and Today tasks to Week\n")
-          (insert "  x: Export tasks\n")
           (insert "  X: Set reminders\n")
           (insert "  z: Collapse/expand all sections\n")
           (insert "  RET: Edit task\n")
@@ -822,19 +810,20 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
       (message "Moved %d task(s) to %s." (length tasks-to-move) target))))
 
 (defun task-manager-toggle-all-sections ()
-  "Toggle expansion of all sections."
+  "Toggle expansion of all sections. First press collapses all sections, second press expands them."
   (interactive)
-  (let ((all-expanded t))
-    ;; Check if all sections are expanded
+  (let ((all-collapsed t))
+    ;; Check if all sections are collapsed
     (dolist (section task-manager-sections)
-      (when (not (gethash section task-manager-expanded-sections))
-        (setq all-expanded nil)))
+      (when (gethash section task-manager-expanded-sections)
+        (setq all-collapsed nil)))
     
     ;; Toggle all sections to the opposite state
     (dolist (section task-manager-sections)
-      (puthash section (not all-expanded) task-manager-expanded-sections))
+      (puthash section (not all-collapsed) task-manager-expanded-sections))
     
-    (task-manager-refresh)))
+    (task-manager-refresh)
+    (message "All sections %s" (if all-collapsed "expanded" "collapsed"))))
 
 (defun task-manager-toggle-task-at-point ()
   "Toggle selection of task at point and move to next task if possible."
@@ -2105,6 +2094,188 @@ Shows a list of existing tags for selection and offers an option to delete all t
     (forward-line 1)
     
     (message "Moved %d tasks from Inbox and Today to Week." count)))
+
+(defun task-manager-duplicate-task ()
+  "Duplicate the task at the current cursor position and move cursor to the new task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (section nil)
+         (task nil)
+         (timestamp (format-time-string "%Y%m%d%H%M%S")))
+    
+    (if task-at-point
+        (progn
+          (setq section (car task-at-point))
+          (setq task (cdr task-at-point))
+          
+          ;; Add a unique identifier to the duplicated task
+          (let ((duplicated-task (format "%s [ID: %s]" task timestamp)))
+            ;; Add the task to the same section
+            (push duplicated-task (gethash section task-manager-tasks))
+            
+            ;; Save and refresh
+            (task-manager-save-tasks)
+            (task-manager-refresh)
+            
+            ;; Find the newly added task (it should be the first task in the section)
+            (goto-char (point-min))
+            (search-forward section nil t)
+            (forward-line 1)  ; Move to the first task line
+            (beginning-of-line)
+            
+            (message "Task duplicated in %s section." section)))
+      (message "No task at cursor position."))))
+
+;; Add timer for automatic task migration
+(defvar task-manager-auto-migrate-timer nil
+  "Timer object for automatic task migration from Today to Week.")
+
+(defun task-manager-auto-migrate-today-to-week ()
+  "Automatically move all tasks from Today section to Week section."
+  (let ((today-tasks (gethash "Today" task-manager-tasks))
+        (week-tasks (gethash "Week" task-manager-tasks))
+        (count 0))
+    
+    ;; Add all Today tasks to Week
+    (dolist (task today-tasks)
+      (push task week-tasks)
+      (setq count (1+ count)))
+    
+    ;; Update the section hash tables
+    (puthash "Week" week-tasks task-manager-tasks)
+    (puthash "Today" nil task-manager-tasks)
+    
+    ;; Remove any of these tasks from selection if they were selected
+    (setq task-manager-selected-tasks 
+          (seq-filter (lambda (task)
+                        (not (member task today-tasks)))
+                      task-manager-selected-tasks))
+    
+    (task-manager-save-tasks)
+    
+    ;; Only refresh if the task manager buffer is visible
+    (let ((buffer (get-buffer "*Task Manager*")))
+      (when (and buffer (get-buffer-window buffer))
+        (with-current-buffer buffer
+          (task-manager-refresh))))
+    
+    (message "Auto-migrated %d tasks from Today to Week section." count)))
+
+(defun task-manager-schedule-auto-migrate ()
+  "Schedule automatic migration of tasks from Today to Week section at 3 AM."
+  (interactive)
+  ;; Cancel any existing timer
+  (when task-manager-auto-migrate-timer
+    (cancel-timer task-manager-auto-migrate-timer))
+  
+  ;; Calculate time until next 3 AM
+  (let* ((now (current-time))
+         (now-decoded (decode-time now))
+         (hour (nth 2 now-decoded))
+         (minute (nth 1 now-decoded))
+         (second (nth 0 now-decoded))
+         (target-hour 3)
+         (target-minute 0)
+         (target-second 0)
+         (seconds-until-target
+          (if (< hour target-hour)
+              ;; If current time is before 3 AM, calculate seconds until 3 AM today
+              (+ (* (- target-hour hour) 3600)
+                 (* (- target-minute minute) 60)
+                 (- target-second second))
+            ;; If current time is after 3 AM, calculate seconds until 3 AM tomorrow
+            (+ (* (- (+ 24 target-hour) hour) 3600)
+               (* (- target-minute minute) 60)
+               (- target-second second)))))
+    
+    ;; Schedule the migration
+    (setq task-manager-auto-migrate-timer
+          (run-at-time seconds-until-target nil 'task-manager-auto-migrate-today-to-week))
+    
+    ;; Calculate and show the next migration time
+    (let ((next-migration-time (time-add now (seconds-to-time seconds-until-target))))
+      (message "Next automatic migration scheduled for %s" 
+               (format-time-string "%Y-%m-%d %H:%M:%S" next-migration-time)))))
+
+;; Add key binding for importing from org-agenda
+(define-key task-manager-mode-map (kbd "O") 'task-manager-import-from-org-agenda)
+
+;; Function to import tasks from org-agenda in a directory
+(defun task-manager-import-from-org-agenda ()
+  "Import tasks from org-agenda in all .org files in a directory and add them to Inbox.
+Excludes tasks.org and backup files (tasks-backup-*). After importing, removes the tasks from the original files."
+  (interactive)
+  (let ((directory (read-directory-name "Directory with org files: "))
+        (imported-count 0))
+    (dolist (file (directory-files directory t "\\.org$"))
+      (let ((filename (file-name-nondirectory file)))
+        (unless (or (string= filename "tasks.org")
+                   (string-match-p "^tasks-backup-" filename))
+          (with-current-buffer (find-file-noselect file)
+            (org-mode)
+            (goto-char (point-min))
+            (let ((positions-to-delete '()))
+              (while (re-search-forward "^\\*+ \\(TODO\\|DONE\\) \\(.*\\)$" nil t)
+                (unless (string= (match-string 1) "DONE")
+                  (push (cons (match-beginning 0)
+                            (save-excursion
+                              (forward-line 1)
+                              (point)))
+                        positions-to-delete)
+                  (push (format "%s [Source: %s]" 
+                              (match-string 2)
+                              filename)
+                        (gethash "Inbox" task-manager-tasks))
+                  (setq imported-count (1+ imported-count))))
+              (when positions-to-delete
+                (setq positions-to-delete (sort positions-to-delete (lambda (a b) (> (car a) (car b)))))
+                (dolist (pos positions-to-delete)
+                  (delete-region (car pos) (cdr pos)))
+                (save-buffer)))))))
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Imported %d tasks from org-agenda to Inbox and removed them from source files." imported-count)))
+
+(defun task-manager-check-overdue-migration ()
+  "Check if tasks should have been migrated since last run and migrate if needed."
+  (let* ((now (current-time))
+         (now-decoded (decode-time now))
+         (current-hour (nth 2 now-decoded))
+         (current-minute (nth 1 now-decoded))
+         (last-run-file (expand-file-name "~/.task-manager-last-run"))
+         (last-run-time
+          (if (file-exists-p last-run-file)
+              (with-temp-buffer
+                (insert-file-contents last-run-file)
+                (string-to-number (buffer-string)))
+            ;; If no last run file, assume last run was 24 hours ago
+            (- (time-to-seconds now) 86400)))
+         (last-run-decoded (decode-time (seconds-to-time last-run-time)))
+         (last-run-hour (nth 2 last-run-decoded))
+         (last-run-date (nth 3 last-run-decoded))
+         (current-date (nth 3 now-decoded)))
+    
+    ;; Check if we missed a migration
+    (when (or
+           ;; If last run was before 3 AM and current time is after 3 AM
+           (and (< last-run-hour 3) (>= current-hour 3))
+           ;; If we missed a whole day
+           (> current-date last-run-date))
+      (message "Performing overdue task migration from Today to Week...")
+      (task-manager-auto-migrate-today-to-week))
+    
+    ;; Save current time as last run time
+    (with-temp-file last-run-file
+      (insert (number-to-string (time-to-seconds now))))))
+
+(defun task-manager-collapse-all-sections ()
+  "Collapse all sections."
+  (interactive)
+  (dolist (section task-manager-sections)
+    (puthash section nil task-manager-expanded-sections))
+  (task-manager-refresh)
+  (message "All sections collapsed"))
 
 (provide 'task-manager2)
 
