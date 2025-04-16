@@ -45,6 +45,8 @@ The task manager automatically helps with this workflow through:
 - **Recurring Tasks**: Set tasks to repeat daily, weekly, or monthly
 - **Tags**: Add and manage tags for better organization
 - **Reminders**: Set reminders for important tasks
+- **Calendar**: Calendar view of tasks with date
+- **Notes**: Notes in the tasks
 - **Search**: Find tasks across all sections
 - **Filtering**: Filter tasks by properties like priority, due date, or tags
 - **Import/Export**: Import tasks from org-agenda or export to various formats
@@ -121,6 +123,7 @@ M-x task-manager2-init
 
 #### Other Functions
 - `z`: Collapse all sections
+- `e`: Shows calendar with dated tasks
 - `C`: Toggle commands visibility
 - `f`: Filter tasks by properties
 - `S`: Search tasks
@@ -129,6 +132,7 @@ M-x task-manager2-init
 - `E`: Export tasks
 - `I`: Import tasks
 - `O`: Import tasks from org-agenda
+- `N`: Add/Edit notes in a task
 - `B`: Create manual backup
 - `u`: Undo
 - `SPC`: Toggle task selection
