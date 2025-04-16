@@ -48,6 +48,10 @@
 ;;  u: Undo (up to 15 operations)
 ;;  n: Next task
 ;;  O: Import tasks from org-agenda in a directory
+;;  e: List tasks with dates
+;;  M: Move all tasks from a section
+;;  N: Manage notes for a task
+;;  n: View notes for a task
 ;; 
 ;; Features:
 ;;  - URLs and file paths in tasks are automatically clickable
@@ -118,37 +122,44 @@
 (defvar task-manager-max-backups 3
   "Maximum number of backup files to keep.")
 
+;; Add a hash table to store task notes
+(defvar task-manager-task-notes (make-hash-table :test 'equal)
+  "Hash table storing notes for each task.")
+
 (defun task-manager-get-task-at-point ()
   "Get the task at the current point, returning a cons of (section . task)."
   (let ((task-found nil)
         (task-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
     
-    ;; Check if we're on a task line
-    (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)$" task-line)
-      (let ((task-text (match-string 2 task-line))
-            (section nil)
-            (original-task nil))
+    ;; Check if we're on a task line, accounting for possible note icon and section info
+    (when (string-match "^\\s-*\\[\\([X ]\\)\\]\\s-*\\(?:📝\\s-*\\)?\\(.*?\\)\\(?:\\s-*(in \\(.*\\))?\\)?$" task-line)
+      (let* ((task-text (match-string 2 task-line))
+             (section-info (match-string 3 task-line))
+             (section nil)
+             (original-task nil))
         
-        ;; Find the section and original task
-        (dolist (sec task-manager-sections)
-          (let ((tasks (gethash sec task-manager-tasks)))
+        ;; If we have section info from "Due Today", use that directly
+        (when section-info
+          (setq section section-info)
+          (let ((tasks (gethash section task-manager-tasks)))
             (dolist (full-task tasks)
-              (when (string-match-p (regexp-quote task-text) full-task)
-                (setq section sec)
-                (setq original-task full-task)
-                (setq task-found t)))))
-        
-        ;; Also check for "Due Today" tasks with section info in parenthesis
-        (unless task-found
-          (when (string-match "\\[\\([X ]\\)\\] \\(.*\\) (in \\(.*\\))" task-line)
-            (setq task-text (match-string 2 task-line))
-            (setq section (match-string 3 task-line))
-            
-            (let ((tasks (gethash section task-manager-tasks)))
-              (dolist (full-task tasks)
-                (when (string-match-p (regexp-quote task-text) full-task)
+              (let ((stripped-task (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" full-task))
+                    (stripped-task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task-text)))
+                (when (string-match-p (regexp-quote (string-trim stripped-task-text)) (string-trim stripped-task))
                   (setq original-task full-task)
                   (setq task-found t))))))
+        
+        ;; If no section info or task not found, search in all sections
+        (unless task-found
+          (dolist (sec task-manager-sections)
+            (let ((tasks (gethash sec task-manager-tasks)))
+              (dolist (full-task tasks)
+                (let ((stripped-task (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" full-task))
+                      (stripped-task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task-text)))
+                  (when (string-match-p (regexp-quote (string-trim stripped-task-text)) (string-trim stripped-task))
+                    (setq section sec)
+                    (setq original-task full-task)
+                    (setq task-found t)))))))
         
         ;; Return a cons of (section . task) if found
         (when task-found
@@ -322,20 +333,20 @@
   (interactive)
   (task-manager-add-task "Week"))
 
-(defun task-manager-add-task-monday ()
-  "Add a task to the Monday section."
+(defun task-manager-add-task-month ()
+  "Add a task to the Month section."
   (interactive)
-  (task-manager-add-task "Monday"))
-
-(defun task-manager-add-task-someday ()
-  "Add a task to the Someday section."
-  (interactive)
-  (task-manager-add-task "Someday"))
+  (task-manager-add-task "Month"))
 
 (defun task-manager-add-task-calendar ()
   "Add a task to the Calendar section."
   (interactive)
   (task-manager-add-task "Calendar"))
+
+(defun task-manager-add-task-someday ()
+  "Add a task to the Someday section."
+  (interactive)
+  (task-manager-add-task "Someday"))
 
 (defun task-manager-add-multiple-tasks-inbox ()
   "Add multiple tasks to the Inbox section."
@@ -352,20 +363,20 @@
   (interactive)
   (task-manager-add-multiple-tasks "Week"))
 
-(defun task-manager-add-multiple-tasks-monday ()
-  "Add multiple tasks to the Monday section."
+(defun task-manager-add-multiple-tasks-month ()
+  "Add multiple tasks to the Month section."
   (interactive)
-  (task-manager-add-multiple-tasks "Monday"))
-
-(defun task-manager-add-multiple-tasks-someday ()
-  "Add multiple tasks to the Someday section."
-  (interactive)
-  (task-manager-add-multiple-tasks "Someday"))
+  (task-manager-add-multiple-tasks "Month"))
 
 (defun task-manager-add-multiple-tasks-calendar ()
   "Add multiple tasks to the Calendar section."
   (interactive)
   (task-manager-add-multiple-tasks "Calendar"))
+
+(defun task-manager-add-multiple-tasks-someday ()
+  "Add multiple tasks to the Someday section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Someday"))
 
 (defun task-manager-move-to-someday ()
   "Move selected tasks to Someday section. If cursor is on a task, use that task."
@@ -485,9 +496,14 @@
               (let* ((section (car task-pair))
                      (task (cdr task-pair))
                      (selected (member task task-manager-selected-tasks))
+                     (has-notes (gethash task task-manager-task-notes))
                      (display-task (replace-regexp-in-string "^TODAY " "" task)))
                 ;; Insert checkbox marker
                 (insert (format "  [%s] " (if selected "X" " ")))
+                
+                ;; Add note indicator if task has notes
+                (when has-notes
+                  (insert (propertize "📝 " 'face '(:foreground "blue" :weight bold))))
                 
                 ;; Process and insert the task with active links
                 (let ((link-start 0)
@@ -512,48 +528,56 @@
             (insert "\n"))
         (insert "  No tasks due today\n\n")))
     
-    ;; Display ALL sections with tasks
+    ;; Display ALL sections with tasks (excluding Notes section)
     (dolist (section task-manager-sections)
-      (let ((tasks (gethash section task-manager-tasks))
-            (expanded (gethash section task-manager-expanded-sections)))
-        (insert (propertize (format "%s (%d)" section (length tasks))
-                            'face 'font-lock-keyword-face))
-        (if expanded
-            (insert " [-]\n")
-          (insert " [+]\n"))
-        
-        ;; Show tasks if section is expanded
-        (when expanded
-          (dolist (task tasks)
-            (let ((selected (member task task-manager-selected-tasks))
-                  (display-task (replace-regexp-in-string "^TODAY " "" task)))
-              ;; Insert checkbox marker
-              (insert (format "  [%s] " (if selected "X" " ")))
-              
-              ;; Process and insert the task with active links
-              (let ((link-start 0))
-                ;; Find URLs and insert as buttons
-                (while (string-match "\\(https?://[^ \t\n\r,;()\"']+\\)" display-task link-start)
-                  (let ((start (match-beginning 1))
-                        (end (match-end 1))
-                        (url (match-string 1 display-task)))
-                    ;; Add text before link
-                    (insert (substring display-task link-start start))
-                    ;; Add button for link
-                    (insert-button url
-                                  :type 'task-url-link
-                                  'url url)
-                    (setq link-start end)))
+      ;; Skip the Notes section
+      (unless (string= section "Notes")
+        (let ((tasks (gethash section task-manager-tasks))
+              (expanded (gethash section task-manager-expanded-sections)))
+          (insert (propertize (format "%s (%d)" section (length tasks))
+                              'face 'font-lock-keyword-face))
+          (if expanded
+              (insert " [-]\n")
+            (insert " [+]\n"))
+          
+          ;; Show tasks if section is expanded
+          (when expanded
+            (dolist (task tasks)
+              (let ((selected (member task task-manager-selected-tasks))
+                    (has-notes (gethash task task-manager-task-notes))
+                    (display-task (replace-regexp-in-string "^TODAY " "" task)))
+                ;; Insert checkbox marker
+                (insert (format "  [%s] " (if selected "X" " ")))
                 
-                ;; Add any remaining text after last link
-                (insert (substring display-task link-start)))
-              
-              (insert "\n"))))))
+                ;; Add note indicator if task has notes
+                (when has-notes
+                  (insert (propertize "📝 " 'face '(:foreground "blue" :weight bold))))
+                
+                ;; Process and insert the task with active links
+                (let ((link-start 0))
+                  ;; Find URLs and insert as buttons
+                  (while (string-match "\\(https?://[^ \t\n\r,;()\"']+\\)" display-task link-start)
+                    (let ((start (match-beginning 1))
+                          (end (match-end 1))
+                          (url (match-string 1 display-task)))
+                      ;; Add text before link
+                      (insert (substring display-task link-start start))
+                      ;; Add button for link
+                      (insert-button url
+                                    :type 'task-url-link
+                                    'url url)
+                      (setq link-start end)))
+                  
+                  ;; Add any remaining text after last link
+                  (insert (substring display-task link-start)))
+                
+                (insert "\n")))))))
     
     ;; Display commands if enabled, otherwise show a hint
     (if task-manager-show-commands
         (progn
           (insert "\nCommands:\n")
+          (insert "Task Entry:\n")
           (insert "  a i: Add task to Inbox\n")
           (insert "  a t: Add task to Today\n")
           (insert "  a w: Add task to Week\n")
@@ -566,23 +590,24 @@
           (insert "  A m: Add multiple tasks to Monday\n")
           (insert "  A s: Add multiple tasks to Someday\n")
           (insert "  A c: Add multiple tasks to Calendar\n")
-          (insert "  b: Bulk edit tasks\n")
-          (insert "  B: Create manual backup\n")
-          (insert "  c: Focus on Calendar section\n")
-          (insert "  C: Toggle commands visibility\n")
+          (insert "\nTask Management:\n")
+          (insert "  RET: Edit task at cursor\n")
+          (insert "  SPC: Toggle task selection\n")
+          (insert "  k: Delete selected tasks\n")
+          (insert "  K: Delete all tasks in section\n")
+          (insert "  l: Duplicate task at cursor\n")
+          (insert "  b: Bulk edit selected tasks\n")
+          (insert "  u: Undo last operation\n")
+          (insert "\nTask Properties:\n")
           (insert "  d: Set due date\n")
           (insert "  D: Clear due date\n")
-          (insert "  E: Export tasks\n")
-          (insert "  f: Filter tasks\n")
-          (insert "  g: Refresh buffer\n")
-          (insert "  i: Focus on Inbox section\n")
-          (insert "  I: Import tasks\n")
-          (insert "  k: Delete task\n")
-          (insert "  K: Delete all tasks in a section\n")
-          (insert "  l: Duplicate task at cursor\n")
-          (insert "  L: Load tasks\n")
-          (insert "  m: Focus on Monday section\n")
-          (insert "  n: Move to next task\n")
+          (insert "  r: Set recurring task\n")
+          (insert "  R: Clear recurring status\n")
+          (insert "  T: Add/remove tags\n")
+          (insert "  X: Set reminders\n")
+          (insert "  N: Add/edit notes\n")
+          (insert "  n: View notes\n")
+          (insert "\nNavigation:\n")
           (insert "  o i: Open Inbox section\n")
           (insert "  o t: Open Today section\n")
           (insert "  o w: Open Week section\n")
@@ -590,95 +615,69 @@
           (insert "  o s: Open Someday section\n")
           (insert "  o c: Open Calendar section\n")
           (insert "  o a: Open Archive section\n")
-          (insert "  p: Move to previous task\n")
-          (insert "  q: Quit buffer\n")
-          (insert "  r: Set recurring task\n")
-          (insert "  R: Clear recurring status\n")
-          (insert "  s: Move task to Someday\n")
+          (insert "  n: Next task\n")
+          (insert "  p: Previous task\n")
+          (insert "\nTask Movement:\n")
+          (insert "  i: Move to Inbox\n")
+          (insert "  t: Move to Today\n")
+          (insert "  w: Move to Week\n")
+          (insert "  m: Move to Monday\n")
+          (insert "  s: Move to Someday\n")
+          (insert "  c: Move to Calendar\n")
+          (insert "  W: Move all Inbox/Today to Week\n")
+          (insert "\nOther Functions:\n")
+          (insert "  B: Create manual backup\n")
+          (insert "  C: Toggle commands visibility\n")
+          (insert "  E: Export tasks\n")
+          (insert "  I: Import tasks\n")
+          (insert "  O: Import from org-agenda\n")
           (insert "  S: Search tasks\n")
-          (insert "  t: Focus on Today section\n")
-          (insert "  T: Add/delete tags\n")
-          (insert "  u: Undo\n")
-          (insert "  v: View all recurring tasks\n")
-          (insert "  w: Move task to Week\n")
-          (insert "  W: Move all Inbox and Today tasks to Week\n")
-          (insert "  X: Set reminders\n")
-          (insert "  z: Collapse/expand all sections\n")
-          (insert "  RET: Edit task\n")
-          (insert "  SPC: Toggle task selection\n"))
+          (insert "  f: Filter tasks\n")
+          (insert "  g: Refresh buffer\n")
+          (insert "  q: Quit buffer\n")
+          (insert "  z: Collapse all sections\n")
+          (insert "  e: List tasks with dates\n")
+          (insert "  M: Move all tasks from a section\n"))
       ;; Show reminder when commands are hidden
       (insert "\nC to show commands\n"))
     
     (goto-char (point-min))))
 
 ;; Task Functions
-(defun task-manager-add-task (section)
-  "Add a task to SECTION. If called with a section key (i, t, w, o, c, s), add directly to that section."
-  (interactive
-   (list (let ((key (read-char "Press section key (i,t,w,o,c,s): ")))
-           (cond
-            ((eq key ?i) "Inbox")
-            ((eq key ?t) "Today")
-            ((eq key ?w) "Week")
-            ((eq key ?o) "Monday")
-            ((eq key ?c) "Calendar")
-            ((eq key ?s) "Someday")
-            (t (message "Invalid section key. Use i,t,w,o,c,s")
-               (keyboard-quit))))))
-  (let ((task (if (string= section "Calendar")
-                  ;; For Calendar section, first get the date
-                  (let ((date (task-manager-select-date-with-calendar)))
-                    (if date
-                        (format "%s [Due: %s]" 
-                                (read-string "Enter new task: ")
-                                date)
-                      (message "Date selection cancelled.")
-                      (keyboard-quit)))
-                ;; For other sections, just get the task
-                (read-string "Enter new task: "))))
-    (unless (string-empty-p task)
+(defun task-manager-add-task (&optional section)
+  "Add a single task to SECTION. If SECTION is not provided, use the current section."
+  (interactive)
+  (let* ((section (or section (task-manager-get-current-section)))
+         (task (read-string (format "Add task to %s: " section))))
+    (when (not (string-empty-p task))
       (push task (gethash section task-manager-tasks))
       (task-manager-save-tasks)
-      (task-manager-refresh))))
+      (task-manager-refresh)
+      ;; Find and move to the new task
+      (goto-char (point-min))
+      (search-forward task nil t)
+      (beginning-of-line)
+      (message "Task added to %s." section))))
 
-(defun task-manager-add-multiple-tasks (section)
-  "Add multiple tasks to SECTION using a temporary buffer for multiline input."
-  (interactive
-   (list (completing-read "Section: " task-manager-sections)))
-  (let ((temp-buffer (get-buffer-create "*Task Input*")))
-    (with-current-buffer temp-buffer
-      (erase-buffer)
-      (insert ";; Enter your tasks below, one per line.\n")
-      (insert ";; Press C-c C-c when done, or C-c C-k to cancel.\n\n")
-      (text-mode)
-      (local-set-key (kbd "C-c C-c") 'exit-recursive-edit)
-      (local-set-key (kbd "C-c C-k") 'abort-recursive-edit))
-    
-    (switch-to-buffer temp-buffer)
-    (recursive-edit)
-    
-    ;; Only process if we didn't abort
-    (when (buffer-live-p temp-buffer)
-      (let ((tasks (with-current-buffer temp-buffer
-                    (split-string (buffer-substring-no-properties 
-                                 (point-min) (point-max))
-                                "\n" t))))
-        ;; Filter out comment lines and empty lines
-        (setq tasks (seq-filter (lambda (task)
-                                 (and (not (string-empty-p task))
-                                      (not (string-match-p "^;;" task))))
-                               tasks))
-        
-        ;; Add tasks to the section
-        (dolist (task tasks)
-          (unless (string-empty-p task)
-            (push task (gethash section task-manager-tasks))))
-        
-        (task-manager-save-tasks)
-        (task-manager-refresh)
-        (message "Added %d tasks to %s section." (length tasks) section)))
-    
-    (kill-buffer temp-buffer)))
+(defun task-manager-add-multiple-tasks (&optional section)
+  "Add multiple tasks to SECTION. If SECTION is not provided, use the current section."
+  (interactive)
+  (let* ((section (or section (task-manager-get-current-section)))
+         (tasks '())
+         (task (read-string (format "Add task to %s (empty line to finish): " section))))
+    (while (not (string-empty-p task))
+      (push task tasks)
+      (setq task (read-string (format "Add task to %s (empty line to finish): " section))))
+    (when tasks
+      (setf (gethash section task-manager-tasks)
+            (append (gethash section task-manager-tasks) (reverse tasks)))
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      ;; Find and move to the last added task
+      (goto-char (point-min))
+      (search-forward (car (reverse tasks)) nil t)
+      (beginning-of-line)
+      (message "Added %d tasks to %s." (length tasks) section))))
 
 (defun task-manager-delete-tasks ()
   "Move selected tasks to Archive section if they're not in Archive,
@@ -1010,6 +1009,14 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
             (dolist (task (reverse tasks)) ;; reverse to maintain order
               (insert (format "** %s\n" task))))))
       
+      ;; Write notes section (hidden from main view)
+      (insert "\n* Notes\n")
+      (maphash (lambda (task notes)
+                 (when (and notes (not (string-empty-p notes)))
+                   (insert (format "** %s\n" task))
+                   (insert (format "*** %s\n" notes))))
+               task-manager-task-notes)
+      
       ;; Write to file
       (write-region (point-min) (point-max) task-manager-save-file))
     
@@ -1022,29 +1029,52 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
   (dolist (section task-manager-sections)
     (puthash section nil task-manager-tasks))
   
+  ;; Clear notes
+  (setq task-manager-task-notes (make-hash-table :test 'equal))
+  
   (when (file-exists-p task-manager-save-file)
     ;; Read and parse the org file
     (with-temp-buffer
       (insert-file-contents task-manager-save-file)
       (org-mode)
       (goto-char (point-min))
-      (let ((current-section nil))
+      (let ((current-section nil)
+            (current-task nil)
+            (in-notes-section nil))
         (while (not (eobp))
           (cond
            ;; Section header (level 1 heading)
            ((looking-at "^\\* \\(.+\\)$")
-            (setq current-section (match-string 1))
-            ;; Make sure section exists (handle custom sections)
-            (unless (member current-section task-manager-sections)
-              (add-to-list 'task-manager-sections current-section)
-              (puthash current-section nil task-manager-tasks)))
+            (let ((section-name (match-string 1)))
+              (if (string= section-name "Notes")
+                  (setq in-notes-section t)
+                (setq in-notes-section nil)
+                (setq current-section section-name)
+                ;; Make sure section exists (handle custom sections)
+                (unless (member current-section task-manager-sections)
+                  (add-to-list 'task-manager-sections current-section)
+                  (puthash current-section nil task-manager-tasks)))))
            
            ;; Task (level 2 heading)
-           ((and current-section
+           ((and (not in-notes-section)
+                 current-section
                  (looking-at "^\\*\\* \\(.+\\)$"))
             (let ((task (match-string 1)))
               (when (and task (not (string-empty-p (string-trim task))))
-                (push task (gethash current-section task-manager-tasks))))))
+                (push task (gethash current-section task-manager-tasks)))))
+           
+           ;; Note (level 2 heading in Notes section)
+           ((and in-notes-section
+                 (looking-at "^\\*\\* \\(.+\\)$"))
+            (setq current-task (match-string 1)))
+           
+           ;; Note content (level 3 heading in Notes section)
+           ((and in-notes-section
+                 current-task
+                 (looking-at "^\\*\\*\\* \\(.+\\)$"))
+            (let ((note-content (match-string 1)))
+              (when (and note-content (not (string-empty-p (string-trim note-content))))
+                (puthash current-task note-content task-manager-task-notes)))))
           (forward-line)))
       
       ;; Custom tasks processing after loading
@@ -2276,6 +2306,279 @@ Excludes tasks.org and backup files (tasks-backup-*). After importing, removes t
     (puthash section nil task-manager-expanded-sections))
   (task-manager-refresh)
   (message "All sections collapsed"))
+
+(defun task-manager-list-tasks-with-dates ()
+  "List all tasks with dates in a new buffer, organized by months and weeks."
+  (interactive)
+  (let ((tasks-with-dates nil)
+        (buffer (get-buffer-create "*Tasks with Dates*"))
+        (today (format-time-string "%a, %d")))  ; Add comma between day and date
+    
+    ;; Collect all tasks with dates
+    (maphash
+     (lambda (section tasks)
+       (dolist (task tasks)
+         (let ((due-date (task-manager-get-due-date task)))
+           (when due-date
+             (push (cons due-date (cons section task)) tasks-with-dates)))))
+     task-manager-tasks)
+    
+    ;; Sort tasks by date
+    (setq tasks-with-dates
+          (sort tasks-with-dates
+                (lambda (a b)
+                  (time-less-p (car a) (car b)))))
+    
+    ;; Display tasks in buffer
+    (with-current-buffer buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        
+        ;; Group tasks by month
+        (let ((current-month nil)
+              (current-week nil)
+              (current-date nil))
+          (dolist (task-info tasks-with-dates)
+            (let* ((due-date (car task-info))
+                   (section (car (cdr task-info)))
+                   (task (cdr (cdr task-info)))
+                   (month-year (format-time-string "%B %Y" due-date))
+                   (week-number (format-time-string "%V" due-date))
+                   (formatted-date (format-time-string "%a, %d" due-date)))  ; Add comma between day and date
+              
+              ;; Print month header if it's a new month
+              (unless (string= month-year current-month)
+                (setq current-month month-year)
+                (insert (format "\n%s\n" (make-string (length month-year) ?=)))
+                (insert (format "%s\n" month-year))
+                (insert (make-string (length month-year) ?=) "\n\n")
+                (setq current-week nil)
+                (setq current-date nil))
+              
+              ;; Print week header if it's a new week
+              (unless (string= week-number current-week)
+                (when current-week
+                  (insert "\n"))  ; Add blank line between weeks
+                (setq current-week week-number)
+                (insert (format "Week %s\n" week-number))
+                (insert (make-string (+ 5 (length week-number)) ?-) "\n")
+                (setq current-date nil))
+              
+              ;; Print date header if it's a new date
+              (unless (string= formatted-date current-date)
+                (when current-date
+                  (insert "\n"))  ; Add blank line between dates
+                (setq current-date formatted-date)
+                (insert "  [")
+                ;; Highlight today's date
+                (if (string= formatted-date today)
+                    (insert-text-button formatted-date
+                                      'face '(:foreground "red" :weight bold)
+                                      'help-echo "Today")
+                  (insert formatted-date))
+                (insert "]\n"))
+              
+              ;; Print the task
+              (insert "    ")  ; Indent tasks under their date
+              (insert-text-button
+               task
+               'action (lambda (_)
+                        (task-manager-goto-task section task))
+               'follow-link t
+               'help-echo "Click to go to this task")
+              (insert "\n"))))
+        
+        (goto-char (point-min))
+        (special-mode)))
+    
+    (switch-to-buffer buffer)))
+
+;; Update the keybinding in task-manager-mode
+(define-key task-manager-mode-map (kbd "e") 'task-manager-list-tasks-with-dates)
+
+(defun task-manager-get-due-date (task)
+  "Extract the due date from TASK and return it as a time value.
+Returns nil if no due date is found."
+  (when (string-match "\\[Due: \\([^]]+\\)\\]" task)
+    (let ((date-str (match-string 1 task)))
+      (when (string-match "\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)" date-str)
+        (let ((year (string-to-number (match-string 1 date-str)))
+              (month (string-to-number (match-string 2 date-str)))
+              (day (string-to-number (match-string 3 date-str))))
+          (encode-time 0 0 0 day month year))))))
+
+(defun task-manager-move-all-from-section ()
+  "Move all tasks from one section to another section."
+  (interactive)
+  (let* ((source-section (completing-read "Move all tasks from section: " task-manager-sections))
+         (target-section (completing-read (format "Move all tasks from %s to section: " source-section) 
+                                        task-manager-sections))
+         (tasks-to-move (gethash source-section task-manager-tasks))
+         (count (length tasks-to-move)))
+    
+    (when (and source-section target-section
+               (not (string= source-section target-section))
+               (> count 0))
+      ;; Add all tasks to target section
+      (dolist (task tasks-to-move)
+        (push task (gethash target-section task-manager-tasks)))
+      
+      ;; Clear source section
+      (puthash source-section nil task-manager-tasks)
+      
+      ;; Remove any of these tasks from selection if they were selected
+      (setq task-manager-selected-tasks 
+            (seq-filter (lambda (task)
+                          (not (member task tasks-to-move)))
+                        task-manager-selected-tasks))
+      
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Focus on target section
+      (puthash target-section t task-manager-expanded-sections)
+      (goto-char (point-min))
+      (search-forward target-section nil t)
+      (forward-line 1)
+      
+      (message "Moved %d tasks from %s to %s." count source-section target-section))))
+
+;; Add key binding for moving all tasks from a section
+(define-key task-manager-mode-map (kbd "M") 'task-manager-move-all-from-section)
+
+;; Function to manage notes for a task
+(defun task-manager-manage-notes ()
+  "Open a buffer to manage notes for the task at cursor position."
+  (interactive)
+  (let* ((task-info (task-manager-get-task-at-point))
+         (task (cdr task-info))
+         (section (car task-info)))
+    (if task
+        (let* ((buffer-name (format "*Notes for: %s*" task))
+               (existing-buffer (get-buffer buffer-name))
+               (notes (gethash task task-manager-task-notes)))
+          (if existing-buffer
+              (switch-to-buffer existing-buffer)
+            (let ((buffer (get-buffer-create buffer-name)))
+              (switch-to-buffer buffer)
+              (org-mode)
+              (insert (format "Task: %s\n" task))
+              (insert (format "Section: %s\n\n" section))
+              (if notes
+                  (progn
+                    (insert notes)
+                    (end-of-buffer)
+                    (newline))
+                (forward-line 3))
+              (setq-local task-manager-current-task task)
+              (setq-local task-manager-current-section section)
+              (local-set-key (kbd "C-c") 'task-manager-save-notes)
+              (local-set-key (kbd "C-k") 'task-manager-exit-notes))))
+      (message "No task at cursor position"))))
+
+(defun task-manager-save-notes ()
+  "Save notes for the current task and close the buffer."
+  (interactive)
+  (let* ((task task-manager-current-task)
+         (section task-manager-current-section)
+         (notes (string-trim (buffer-substring-no-properties 
+                            (save-excursion
+                              (goto-char (point-min))
+                              (forward-line 3)
+                              (point))
+                            (point-max)))))
+    
+    (if (string-empty-p notes)
+        ;; If notes are empty, remove them and the note icon
+        (progn
+          (remhash task task-manager-task-notes)
+          (message "Notes removed."))
+      ;; Otherwise, save the notes
+      (puthash task notes task-manager-task-notes)
+      (message "Notes saved."))
+    
+    ;; Save to file and refresh display
+    (task-manager-save-tasks)
+    (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+      (kill-buffer)
+      (with-current-buffer "*Task Manager*"
+        (task-manager-refresh)
+        ;; Find and move to the task
+        (goto-char (point-min))
+        (search-forward task-text nil t)
+        (beginning-of-line)))))
+
+(defun task-manager-exit-notes ()
+  "Exit the notes buffer without saving."
+  (interactive)
+  (let ((task task-manager-current-task)
+        (task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task-manager-current-task)))
+    (kill-buffer)
+    (message "Notes not saved.")
+    ;; Return to task manager and find the task
+    (with-current-buffer "*Task Manager*"
+      (goto-char (point-min))
+      (search-forward task-text nil t)
+      (beginning-of-line))))
+
+(defun task-manager-view-notes ()
+  "View notes for the task at point in read-only mode."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (when task-at-point (cdr task-at-point)))
+         (section (when task-at-point (car task-at-point))))
+    
+    (if (not task)
+        (message "No task at cursor position.")
+      (let* ((notes (gethash task task-manager-task-notes))
+             (notes-buffer-name (format "*View Notes: %s*" (substring task 0 (min 30 (length task)))))
+             (notes-buffer (get-buffer-create notes-buffer-name)))
+        
+        (if (not notes)
+            (message "No notes for this task.")
+          ;; Set up the view buffer
+          (with-current-buffer notes-buffer
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (insert "Task Notes (Read Only)\n")
+              (insert "====================\n\n")
+              (insert (format "Task: %s\n" task))
+              (insert (format "Section: %s\n\n" section))
+              (insert "----------------------------------------\n\n")
+              (insert notes)
+              (goto-char (point-min))
+              (view-mode)
+              (local-set-key (kbd "q") 'kill-buffer)))
+          
+          ;; Display the buffer
+          (switch-to-buffer notes-buffer))))))
+
+;; Update task display to show note icon more prominently
+(defun task-manager-format-task (task section &optional in-today-section)
+  "Format a task for display, including checkbox and note icon if present."
+  (let* ((selected (member task task-manager-selected-tasks))
+         (has-notes (gethash task task-manager-task-notes))
+         (display-task (replace-regexp-in-string "^TODAY " "" task))
+         (formatted ""))
+    
+    ;; Add checkbox
+    (setq formatted (concat formatted (format "  [%s] " (if selected "X" " "))))
+    
+    ;; Add note indicator if task has notes
+    (when has-notes
+      (setq formatted (concat formatted 
+                             (propertize "📝 " 
+                                        'face '(:foreground "blue" :weight bold)
+                                        'help-echo "Task has notes (press N to view/edit)"))))
+    
+    ;; Add task text
+    (setq formatted (concat formatted display-task))
+    
+    ;; Add section info for tasks in Today section
+    (when in-today-section
+      (setq formatted (concat formatted (format " (in %s)" section))))
+    
+    formatted))
 
 (provide 'task-manager2)
 
