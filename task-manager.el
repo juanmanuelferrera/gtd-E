@@ -644,12 +644,39 @@
     (goto-char (point-min))))
 
 ;; Task Functions
-(defun task-manager-add-task (&optional section)
-  "Add a single task to SECTION. If SECTION is not provided, use the current section."
-  (interactive)
-  (let* ((section (or section (task-manager-get-current-section)))
-         (task (read-string (format "Add task to %s: " section))))
-    (when (not (string-empty-p task))
+(defun task-manager-add-task (section)
+  "Add a task to SECTION. If called with a section key (i, t, w, o, c, s), add directly to that section."
+  (interactive
+   (list (let ((key (read-char "Press section key (i,t,w,o,c,s): ")))
+           (cond
+            ((eq key ?i) "Inbox")
+            ((eq key ?t) "Today")
+            ((eq key ?w) "Week")
+            ((eq key ?o) "Monday")
+            ((eq key ?c) "Calendar")
+            ((eq key ?s) "Someday")
+            (t (message "Invalid section key. Use i,t,w,o,c,s")
+               (keyboard-quit))))))
+  (let ((task (if (string= section "Calendar")
+                  ;; For Calendar section, first get the date
+                  (let ((date (task-manager-select-date-with-calendar)))
+                    (if date
+                        (let ((task-text (read-string "Enter new task: ")))
+                          (if (string-empty-p task-text)
+                              (progn
+                                (message "Task creation cancelled.")
+                                (keyboard-quit))
+                            (format "%s [Due: %s]" task-text date)))
+                      (message "Date selection cancelled.")
+                      (keyboard-quit)))
+                ;; For other sections, just get the task
+                (let ((task-text (read-string "Enter new task: ")))
+                  (if (string-empty-p task-text)
+                      (progn
+                        (message "Task creation cancelled.")
+                        (keyboard-quit))
+                    task-text)))))
+    (when task
       (push task (gethash section task-manager-tasks))
       (task-manager-save-tasks)
       (task-manager-refresh)
@@ -1014,7 +1041,11 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
       (maphash (lambda (task notes)
                  (when (and notes (not (string-empty-p notes)))
                    (insert (format "** %s\n" task))
-                   (insert (format "*** %s\n" notes))))
+                   (insert ":NOTES:\n")
+                   (insert notes)
+                   (unless (string-suffix-p "\n" notes)
+                     (insert "\n"))
+                   (insert ":END:\n")))
                task-manager-task-notes)
       
       ;; Write to file
@@ -1040,7 +1071,8 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
       (goto-char (point-min))
       (let ((current-section nil)
             (current-task nil)
-            (in-notes-section nil))
+            (in-notes-section nil)
+            (in-notes-content nil))
         (while (not (eobp))
           (cond
            ;; Section header (level 1 heading)
@@ -1063,18 +1095,26 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
               (when (and task (not (string-empty-p (string-trim task))))
                 (push task (gethash current-section task-manager-tasks)))))
            
-           ;; Note (level 2 heading in Notes section)
+           ;; Note task (level 2 heading in Notes section)
            ((and in-notes-section
                  (looking-at "^\\*\\* \\(.+\\)$"))
-            (setq current-task (match-string 1)))
+            (setq current-task (match-string 1))
+            (setq in-notes-content nil))
            
-           ;; Note content (level 3 heading in Notes section)
+           ;; Start of notes content
            ((and in-notes-section
                  current-task
-                 (looking-at "^\\*\\*\\* \\(.+\\)$"))
-            (let ((note-content (match-string 1)))
-              (when (and note-content (not (string-empty-p (string-trim note-content))))
-                (puthash current-task note-content task-manager-task-notes)))))
+                 (looking-at "^:NOTES:$"))
+            (setq in-notes-content t)
+            (let ((notes-content ""))
+              (forward-line)
+              (while (and (not (eobp))
+                         (not (looking-at "^:END:$")))
+                (setq notes-content (concat notes-content (buffer-substring-no-properties (line-beginning-position) (line-end-position)) "\n"))
+                (forward-line))
+              (when (not (string-empty-p notes-content))
+                (puthash current-task (string-trim-right notes-content) task-manager-task-notes))
+              (setq in-notes-content nil))))
           (forward-line)))
       
       ;; Custom tasks processing after loading
@@ -2579,6 +2619,9 @@ Returns nil if no due date is found."
       (setq formatted (concat formatted (format " (in %s)" section))))
     
     formatted))
+
+;; Add key binding for editing task notes
+(define-key task-manager-mode-map (kbd "N") 'task-manager-manage-notes)
 
 (provide 'task-manager2)
 
