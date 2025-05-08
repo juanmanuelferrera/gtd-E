@@ -67,6 +67,7 @@
 (require 'calendar)
 (require 'autorevert)
 (require 'org)
+(require 'browse-url)  ; Add this line to require browse-url
 
 (defvar task-manager-sections
   '("Inbox" "Today" "Week" "Monday" "Calendar" "Someday" "Archive")
@@ -472,10 +473,21 @@
     (erase-buffer)
     (insert "GTD + Emacs\n")
     (insert "============\n")
-    (insert (format "%s [%s]\n\n" current-date current-time))
+    
+    ;; Calculate days until December 19th, 2045
+    (let* ((target-date (encode-time 0 0 0 19 12 2045))
+           (now (current-time))
+           (birth-date (encode-time 0 0 0 19 12 1961))
+           (seconds-remaining (- (time-to-seconds target-date) (time-to-seconds now)))
+           (days-remaining (floor (/ seconds-remaining 86400)))
+           (weeks-remaining (floor (/ days-remaining 7)))
+           (total-life-seconds (- (time-to-seconds target-date) (time-to-seconds birth-date)))
+           (life-percentage (floor (* 100 (/ seconds-remaining total-life-seconds)))))
+      (insert (format "%s [%s] -> %d%% | %d Weeks | %d Days left in this body\n\n" 
+                     current-date current-time life-percentage weeks-remaining days-remaining)))
     
     ;; Display tasks due today at the top
-    (insert (propertize "Due Today" 'face '(:inherit font-lock-keyword-face :weight bold)))
+    (insert (propertize "Due Today" 'face '(:inherit font-lock-keyword-face :weight bold :foreground "#FF6B6B")))
     (insert " [-]\n")
     (let ((due-today-tasks nil))
       ;; Find tasks due today or with daily recurring
@@ -534,14 +546,27 @@
       (unless (string= section "Notes")
         (let ((tasks (gethash section task-manager-tasks))
               (expanded (gethash section task-manager-expanded-sections)))
+          ;; Add section header with color based on section
           (insert (propertize (format "%s (%d)" section (length tasks))
-                              'face 'font-lock-keyword-face))
+                             'face (cond
+                                   ((string= section "Inbox") '(:foreground "#4ECDC4" :weight bold))
+                                   ((string= section "Today") '(:foreground "#FF6B6B" :weight bold))
+                                   ((string= section "Week") '(:foreground "#45B7D1" :weight bold))
+                                   ((string= section "Monday") '(:foreground "#96CEB4" :weight bold))
+                                   ((string= section "Calendar") '(:foreground "#FFEEAD" :weight bold))
+                                   ((string= section "Someday") '(:foreground "#D4A5A5" :weight bold))
+                                   ((string= section "Archive") '(:foreground "#9B9B9B" :weight bold))
+                                   (t '(:foreground "#4A4A4A" :weight bold)))))
           (if expanded
               (insert " [-]\n")
             (insert " [+]\n"))
           
           ;; Show tasks if section is expanded
           (when expanded
+            ;; Sort tasks if in Calendar section
+            (when (string= section "Calendar")
+              (setq tasks (task-manager-sort-tasks-by-due-date tasks)))
+            
             (dolist (task tasks)
               (let ((selected (member task task-manager-selected-tasks))
                     (has-notes (gethash task task-manager-task-notes))
@@ -677,14 +702,24 @@
                         (keyboard-quit))
                     task-text)))))
     (when task
-      (push task (gethash section task-manager-tasks))
+      ;; Check if task has a due date in any format
+      (if (or (string-match "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" task)
+              (string-match "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" task)
+              (string-match "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" task))
+          ;; If task has a due date, add it to Calendar section
+          (progn
+            (push task (gethash "Calendar" task-manager-tasks))
+            (message "Task added to Calendar section due to date."))
+        ;; Otherwise add it to the requested section
+        (progn
+          (push task (gethash section task-manager-tasks))
+          (message "Task added to %s section." section)))
       (task-manager-save-tasks)
       (task-manager-refresh)
       ;; Find and move to the new task
       (goto-char (point-min))
       (search-forward task nil t)
-      (beginning-of-line)
-      (message "Task added to %s." section))))
+      (beginning-of-line))))
 
 (defun task-manager-add-multiple-tasks (&optional section)
   "Add multiple tasks to SECTION. If SECTION is not provided, use the current section."
@@ -1009,6 +1044,9 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
   ;; Check if backup is needed
   (task-manager-backup-if-needed)
   
+  ;; Move any tasks with dates to Calendar section before saving
+  (task-manager-move-tasks-with-dates-to-calendar)
+  
   ;; Read existing file to preserve structure and format
   (let ((existing-content ""))
     
@@ -1116,6 +1154,9 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
                 (puthash current-task (string-trim-right notes-content) task-manager-task-notes))
               (setq in-notes-content nil))))
           (forward-line)))
+      
+      ;; Move any tasks with dates to Calendar section
+      (task-manager-move-tasks-with-dates-to-calendar)
       
       ;; Custom tasks processing after loading
       (message "Tasks loaded from %s" task-manager-save-file))))
@@ -2512,7 +2553,7 @@ Returns nil if no due date is found."
                 (forward-line 3))
               (setq-local task-manager-current-task task)
               (setq-local task-manager-current-section section)
-              (local-set-key (kbd "C-c") 'task-manager-save-notes)
+              (local-set-key (kbd "N") 'task-manager-save-notes)
               (local-set-key (kbd "C-k") 'task-manager-exit-notes))))
       (message "No task at cursor position"))))
 
@@ -2622,6 +2663,555 @@ Returns nil if no due date is found."
 
 ;; Add key binding for editing task notes
 (define-key task-manager-mode-map (kbd "N") 'task-manager-manage-notes)
+
+(defun task-manager-parse-date-from-task (task)
+  "Extract date from TASK string in format [Due: YYYY-MM-DD], YYYY-MM-DD or <YYYY-MM-DD Day>."
+  (let ((date nil))
+    ;; Try to match [Due: YYYY-MM-DD] format
+    (if (string-match "\\[Due: \\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)\\]" task)
+        (setq date (match-string 1 task))
+      ;; Try to match <YYYY-MM-DD Day> format
+      (if (string-match "<\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\) [A-Za-z]\\{3\\}>" task)
+          (setq date (match-string 1 task))
+        ;; Try to match YYYY-MM-DD format
+        (when (string-match "\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)" task)
+          (setq date (match-string 1 task)))))
+    date))
+
+(defun task-manager-move-tasks-with-dates-to-calendar ()
+  "Move all tasks with due dates to Calendar section."
+  (dolist (section task-manager-sections)
+    (unless (string= section "Calendar")
+      (let ((tasks (gethash section task-manager-tasks))
+            (tasks-to-move nil))
+        (dolist (task tasks)
+          (when (or (string-match "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" task)
+                    (string-match "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" task)
+                    (string-match "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" task))
+            (push task tasks-to-move)))
+        ;; Move tasks to Calendar
+        (dolist (task tasks-to-move)
+          (setf (gethash section task-manager-tasks)
+                (remove task (gethash section task-manager-tasks)))
+          (push task (gethash "Calendar" task-manager-tasks)))))))
+
+(defun task-manager-make-urls-clickable (text)
+  "Convert URLs in text to clickable links, showing only the link text."
+  (let ((url-regexp "https?://[^[:space:]]+"))
+    (replace-regexp-in-string
+     url-regexp
+     (lambda (url)
+       (let ((display-text (replace-regexp-in-string "^https?://" "" url)))
+         (format "<a href=\"%s\">%s</a>" url display-text)))
+     text)))
+
+(defun task-manager-generate-html-report ()
+  "Generate an HTML report with tables for Due Today, Today tasks, and Calendar tasks."
+  (interactive)
+  (let* ((today (format-time-string "%Y-%m-%d"))
+         (due-today-tasks nil)
+         (today-tasks nil)
+         (calendar-tasks nil)
+         (report-file (expand-file-name "task-report.html" (file-name-directory task-manager-save-file)))
+         (markdown-file (expand-file-name "task-report.md" (file-name-directory task-manager-save-file))))
+    
+    ;; Collect tasks
+    (dolist (section task-manager-sections)
+      (let ((tasks (gethash section task-manager-tasks)))
+        (dolist (task tasks)
+          (cond
+           ;; Due Today tasks
+           ((or (and (string-match "\\[Due: \\([^]]+\\)\\]" task)
+                     (string= (match-string 1 task) today))
+                (string-match-p "\\[Recurring: daily\\]" task))
+            (push task due-today-tasks))
+           ;; Today section tasks
+           ((string= section "Today")
+            (push task today-tasks))
+           ;; Calendar section tasks
+           ((string= section "Calendar")
+            (push task calendar-tasks))))))
+    
+    ;; Reverse the lists to maintain original order
+    (setq due-today-tasks (reverse due-today-tasks))
+    (setq today-tasks (reverse today-tasks))
+    (setq calendar-tasks (reverse calendar-tasks))
+    
+    ;; Take only first 15 Calendar tasks
+    (setq calendar-tasks (seq-take calendar-tasks 15))
+    
+    ;; Generate HTML
+    (with-temp-buffer
+      (insert "<!DOCTYPE html>\n")
+      (insert "<html lang=\"en\">\n<head>\n")
+      (insert "<meta charset=\"UTF-8\">\n")
+      (insert "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\n")
+      (insert "<style>\n")
+      ;; Base styles for accessibility
+      (insert "body { 
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+        margin: 0;
+        padding: 20px;
+        font-size: 17.28px;  /* Decreased from 19.2px by 10% */
+        line-height: 1.6;
+        color: #000;
+        background-color: #fff;
+        -webkit-text-size-adjust: 100%;
+        -webkit-font-smoothing: antialiased;
+      }\n")
+      ;; Section headers
+      (insert "h1 {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 20px 0 10px;
+        padding: 8px;
+        background-color: #f0f0f0;
+        border-radius: 8px;
+        color: #000;
+      }\n")
+      (insert "h2 { 
+        font-size: 18px;
+        font-weight: 700;
+        margin: 20px 0 10px;
+        padding: 8px;
+        background-color: #f0f0f0;
+        border-radius: 8px;
+        color: #000;
+      }\n")
+      ;; Task containers
+      (insert ".task-container {
+        margin: 4px 0;
+        padding: 6px 10px;
+        border-radius: 4px;
+        background-color: #fff;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        max-width: 95%;
+        display: inline-block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.2s ease;
+      }\n")
+      ;; Due Today tasks
+      (insert ".due-today {
+        background-color: #ffebee;
+        border-left: 3px solid #d32f2f;
+      }\n")
+      ;; Today tasks
+      (insert ".today {
+        background-color: #e8f5e9;
+        border-left: 3px solid #2e7d32;
+      }\n")
+      ;; Calendar tasks
+      (insert ".calendar {
+        background-color: #e3f2fd;
+        border-left: 3px solid #1976d2;
+      }\n")
+      ;; Task text
+      (insert ".task-text {
+        font-size: 17.28px;
+        margin: 0;
+        padding: 2px 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.2;
+      }\n")
+      ;; Task date
+      (insert ".task-date {
+        font-size: 14.4px;
+        color: #666;
+        margin-bottom: 1px;
+        white-space: nowrap;
+      }\n")
+      ;; Links
+      (insert "a {
+        color: #0066cc;
+        text-decoration: underline;
+        font-size: 17.28px;  /* Decreased from 19.2px by 10% */
+      }\n")
+      ;; Focus styles for accessibility
+      (insert "*:focus {
+        outline: 3px solid #0066cc;
+        outline-offset: 2px;
+      }\n")
+      ;; Completed task styles
+      (insert ".completed {
+        text-decoration: line-through;
+        opacity: 0.6;
+      }\n")
+      ;; High contrast mode support
+      (insert "@media (prefers-contrast: more) {
+        body { color: #000; background: #fff; }
+        .due-today { background: #fff; border-left-color: #000; }
+        .today { background: #fff; border-left-color: #000; }
+        .calendar { background: #fff; border-left-color: #000; }
+        a { color: #000; }
+      }\n")
+      ;; Dark mode support
+      (insert "@media (prefers-color-scheme: dark) {
+        body { color: #fff; background: #000; }
+        h2 { background-color: #1a1a1a; color: #fff; }
+        .task-container { background-color: #1a1a1a; }
+        .due-today { background-color: #330000; }
+        .today { background-color: #003300; }
+        .calendar { background-color: #000033; }
+        .task-date { color: #ccc; }
+        a { color: #66b3ff; }
+      }\n")
+      (insert "</style>\n")
+      (insert "<script>\n")
+      (insert "document.addEventListener('DOMContentLoaded', function() {
+        // Get all task containers
+        const taskContainers = document.querySelectorAll('.task-container');
+        
+        // Add touch event listeners to each task container
+        taskContainers.forEach(container => {
+          let touchStartTime;
+          let touchEndTime;
+          
+          container.addEventListener('touchstart', function(e) {
+            touchStartTime = new Date().getTime();
+          }, false);
+          
+          container.addEventListener('touchend', function(e) {
+            touchEndTime = new Date().getTime();
+            const touchDuration = touchEndTime - touchStartTime;
+            
+            // Only toggle if it's a quick tap (less than 300ms)
+            if (touchDuration < 300) {
+              const taskText = container.querySelector('.task-text');
+              taskText.classList.toggle('completed');
+              
+              // Save the state to localStorage
+              const taskId = container.getAttribute('data-task-id');
+              const isCompleted = taskText.classList.contains('completed');
+              localStorage.setItem('task-' + taskId, isCompleted);
+            }
+          }, false);
+        });
+        
+        // Restore completed states from localStorage
+        taskContainers.forEach(container => {
+          const taskId = container.getAttribute('data-task-id');
+          const isCompleted = localStorage.getItem('task-' + taskId) === 'true';
+          if (isCompleted) {
+            const taskText = container.querySelector('.task-text');
+            taskText.classList.add('completed');
+          }
+        });
+      });\n")
+      (insert "</script>\n")
+      (insert "</head>\n<body>\n")
+      
+      ;; Due Today section
+      (insert "<h2>Due Today</h2>\n")
+      (dolist (task due-today-tasks)
+        (insert "<div class=\"task-container due-today\" data-task-id=\"")
+        (insert (md5 task))  ;; Use MD5 hash of task as unique ID
+        (insert "\">\n")
+        (insert "<p class=\"task-text\">")
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (task-manager-make-urls-clickable task-text)))
+        (insert "</p>\n</div>\n"))
+      
+      ;; Today tasks section
+      (insert "<h2>Today</h2>\n")
+      (dolist (task today-tasks)
+        (insert "<div class=\"task-container today\" data-task-id=\"")
+        (insert (md5 task))  ;; Use MD5 hash of task as unique ID
+        (insert "\">\n")
+        (insert "<p class=\"task-text\">")
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (task-manager-make-urls-clickable task-text)))
+        (insert "</p>\n</div>\n"))
+      
+      ;; Calendar tasks section
+      (insert "<h2>Calendar</h2>\n")
+      (dolist (task calendar-tasks)
+        (let* ((date (task-manager-parse-date-from-task task))
+               (task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task))
+               (task-text (replace-regexp-in-string "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" "" task-text))
+               (task-text (replace-regexp-in-string "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" "" task-text))
+               (task-text (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" "" task-text))
+               (task-text (string-trim task-text))
+               (formatted-date (when date
+                                (let ((time (encode-time 0 0 0 
+                                                         (string-to-number (substring date 8 10))
+                                                         (string-to-number (substring date 5 7))
+                                                         (string-to-number (substring date 0 4)))))
+                                  (format-time-string "%A, %d/%m %Y" time)))))
+          (insert "<div class=\"task-container calendar\" data-task-id=\"")
+          (insert (md5 task))  ;; Use MD5 hash of task as unique ID
+          (insert "\">\n")
+          (when formatted-date
+            (insert (format "<p class=\"task-date\">%s</p>\n" formatted-date)))
+          (insert "<p class=\"task-text\">")
+          (insert (task-manager-make-urls-clickable task-text))
+          (insert "</p>\n</div>\n")))
+      
+      (insert "</body>\n</html>")
+      
+      ;; Save HTML to file silently
+      (write-region (point-min) (point-max) report-file nil t))
+    
+    ;; Generate Markdown
+    (with-temp-buffer
+      (insert "# Task Report\n\n")
+      
+      ;; Due Today section
+      (insert "## Due Today\n\n")
+      (dolist (task due-today-tasks)
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (format "- %s\n" task-text))))
+      (insert "\n")
+      
+      ;; Today section
+      (insert "## Today\n\n")
+      (dolist (task today-tasks)
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (format "- %s\n" task-text))))
+      (insert "\n")
+      
+      ;; Calendar section
+      (insert "## Calendar\n\n")
+      (dolist (task calendar-tasks)
+        (let* ((date (task-manager-parse-date-from-task task))
+               (task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task))
+               (task-text (replace-regexp-in-string "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" "" task-text))
+               (task-text (replace-regexp-in-string "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" "" task-text))
+               (task-text (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" "" task-text))
+               (task-text (string-trim task-text))
+               (formatted-date (when date
+                                (let ((time (encode-time 0 0 0 
+                                                       (string-to-number (substring date 8 10))
+                                                       (string-to-number (substring date 5 7))
+                                                       (string-to-number (substring date 0 4)))))
+                                  (format-time-string "%A, %d/%m %Y" time)))))
+          (insert (format "### %s\n\n" (or formatted-date "")))
+          (insert (format "- %s\n\n" task-text))))
+      
+      ;; Save Markdown to file silently
+      (write-region (point-min) (point-max) markdown-file nil t))
+    
+    (message "HTML and Markdown reports generated at %s" report-file)))
+
+;; Add key binding for HTML report generation
+(define-key task-manager-mode-map (kbd "H") 'task-manager-generate-html-report)
+
+;; Add variable for the auto-report timer
+(defvar task-manager-auto-report-timer nil
+  "Timer object for automatic HTML report generation.")
+
+(defun task-manager-schedule-auto-report ()
+  "Schedule automatic generation of HTML report at 10:00 AM local time."
+  (interactive)
+  ;; Cancel any existing timer
+  (when task-manager-auto-report-timer
+    (cancel-timer task-manager-auto-report-timer))
+  
+  ;; Calculate time until next 10 AM
+  (let* ((now (current-time))
+         (now-decoded (decode-time now))
+         (hour (nth 2 now-decoded))
+         (minute (nth 1 now-decoded))
+         (second (nth 0 now-decoded))
+         (target-hour 10)
+         (target-minute 0)
+         (target-second 0)
+         (seconds-until-target
+          (if (< hour target-hour)
+              ;; If current time is before 10 AM, calculate seconds until 10 AM today
+              (+ (* (- target-hour hour) 3600)
+                 (* (- target-minute minute) 60)
+                 (- target-second second))
+            ;; If current time is after 10 AM, calculate seconds until 10 AM tomorrow
+            (+ (* (- (+ 24 target-hour) hour) 3600)
+               (* (- target-minute minute) 60)
+               (- target-second second)))))
+    
+    ;; Schedule the report generation
+    (setq task-manager-auto-report-timer
+          (run-at-time seconds-until-target nil 'task-manager-generate-auto-report))
+    
+    ;; Calculate and show the next report time
+    (let ((next-report-time (time-add now (seconds-to-time seconds-until-target))))
+      (message "Next automatic report generation scheduled for %s" 
+               (format-time-string "%Y-%m-%d %H:%M:%S" next-report-time)))))
+
+(defun task-manager-generate-auto-report ()
+  "Generate and save HTML report automatically at scheduled time."
+  (let* ((today (format-time-string "%Y-%m-%d"))
+         (due-today-tasks nil)
+         (today-tasks nil)
+         (calendar-tasks nil)
+         (report-file "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/task-report.html")
+         (markdown-file "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/task-report.md"))
+    
+    ;; Collect tasks
+    (dolist (section task-manager-sections)
+      (let ((tasks (gethash section task-manager-tasks)))
+        (dolist (task tasks)
+          (cond
+           ;; Due Today tasks
+           ((or (and (string-match "\\[Due: \\([^]]+\\)\\]" task)
+                     (string= (match-string 1 task) today))
+                (string-match-p "\\[Recurring: daily\\]" task))
+            (push task due-today-tasks))
+           ;; Today section tasks
+           ((string= section "Today")
+            (push task today-tasks))
+           ;; Calendar section tasks
+           ((string= section "Calendar")
+            (push task calendar-tasks))))))
+    
+    ;; Reverse the lists to maintain original order
+    (setq due-today-tasks (reverse due-today-tasks))
+    (setq today-tasks (reverse today-tasks))
+    (setq calendar-tasks (reverse calendar-tasks))
+    
+    ;; Take only first 15 Calendar tasks
+    (setq calendar-tasks (seq-take calendar-tasks 15))
+    
+    ;; Generate HTML
+    (with-temp-buffer
+      (insert "<!DOCTYPE html>\n")
+      (insert "<html>\n<head>\n")
+      (insert "<meta charset=\"UTF-8\">\n")
+      (insert "<style>\n")
+      (insert "body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; margin: 40px; font-size: 32px; line-height: 1.5; color: #333; }\n")
+      (insert "table { border-collapse: collapse; margin-bottom: 30px; width: 100%; }\n")
+      (insert "th { background-color: #f8f8f8; padding: 12px; text-align: left; font-size: 28px; font-weight: 600; color: #666; border-bottom: 1px solid #e0e0e0; }\n")
+      (insert "td { padding: 12px; border-bottom: 1px solid #e0e0e0; font-size: 32px; }\n")
+      (insert "h1 { color: #333; margin-top: 40px; font-size: 41px; font-weight: 600; }\n")
+      (insert "h2 { color: #333; margin-top: 30px; font-size: 34px; font-weight: 600; }\n")
+      (insert ".due-today { background-color: #ff6b6b; color: white; }\n")
+      (insert ".today { background-color: #4ecdc4; color: white; }\n")
+      (insert ".calendar { background-color: #fff9e6; }\n")
+      (insert "tr:nth-child(even) { background-color: #fafafa; }\n")
+      (insert "tr:hover { background-color: #f5f5f5; }\n")
+      (insert "a { color: #0066cc; text-decoration: none; font-size: 32px; }\n")
+      (insert "a:hover { text-decoration: underline; }\n")
+      (insert ".task-date { color: #666; font-size: 28px; }\n")
+      (insert ".task-text { font-size: 32px; }\n")
+      (insert ".today td { padding: 8px 12px; line-height: 1.2; }\n")  ;; Reduced line height and padding
+      (insert ".today tr { margin: 0; border-spacing: 0; }\n")  ;; Remove spacing between rows
+      (insert ".today table { border-spacing: 0; border-collapse: collapse; }\n")  ;; Ensure no spacing in table
+      (insert "</style>\n")
+      (insert "</head>\n<body>\n")
+      
+      ;; Due Today table
+      (insert "<h2>Due Today</h2>\n")
+      (insert "<table>\n")
+      (dolist (task due-today-tasks)
+        (insert "<tr class=\"due-today\"><td class=\"task-text\">")
+        (insert (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task))
+        (insert "</td></tr>\n"))
+      (insert "</table>\n")
+      
+      ;; Today tasks table
+      (insert "<h2>Today</h2>\n")
+      (insert "<table class=\"today\">\n")  ;; Add class to table
+      (dolist (task today-tasks)
+        (insert "<tr class=\"today\"><td class=\"task-text\">")
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (task-manager-make-urls-clickable task-text)))
+        (insert "</td></tr>\n"))
+      (insert "</table>\n")
+      
+      ;; Calendar tasks table
+      (insert "<h2>Calendar</h2>\n")
+      (insert "<table>\n")
+      (dolist (task calendar-tasks)
+        (let* ((date (task-manager-parse-date-from-task task))
+               (task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task))
+               (task-text (replace-regexp-in-string "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" "" task-text))
+               (task-text (replace-regexp-in-string "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" "" task-text))
+               (task-text (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" "" task-text))
+               (task-text (string-trim task-text))
+               (formatted-date (when date
+                                (let ((time (encode-time 0 0 0 
+                                                         (string-to-number (substring date 8 10))
+                                                         (string-to-number (substring date 5 7))
+                                                         (string-to-number (substring date 0 4)))))
+                                  (format-time-string "%A, %d/%m %Y" time)))))
+          (insert "<tr class=\"calendar\"><td class=\"task-date\">")
+          (insert (or formatted-date ""))
+          (insert "</td><td class=\"task-text\">")
+          (insert (task-manager-make-urls-clickable task-text))
+          (insert "</td></tr>\n")))
+      (insert "</table>\n")
+      
+      (insert "</body>\n</html>")
+      
+      ;; Save HTML to file silently
+      (write-region (point-min) (point-max) report-file nil t))
+    
+    ;; Generate Markdown
+    (with-temp-buffer
+      (insert "# Task Report\n\n")
+      
+      ;; Due Today section
+      (insert "## Due Today\n\n")
+      (dolist (task due-today-tasks)
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (format "- %s\n" task-text))))
+      (insert "\n")
+      
+      ;; Today section
+      (insert "## Today\n\n")
+      (dolist (task today-tasks)
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (format "- %s\n" task-text))))
+      (insert "\n")
+      
+      ;; Calendar section
+      (insert "## Calendar\n\n")
+      (dolist (task calendar-tasks)
+        (let* ((date (task-manager-parse-date-from-task task))
+               (task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task))
+               (task-text (replace-regexp-in-string "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" "" task-text))
+               (task-text (replace-regexp-in-string "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" "" task-text))
+               (task-text (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" "" task-text))
+               (task-text (string-trim task-text))
+               (formatted-date (when date
+                                (let ((time (encode-time 0 0 0 
+                                                       (string-to-number (substring date 8 10))
+                                                       (string-to-number (substring date 5 7))
+                                                       (string-to-number (substring date 0 4)))))
+                                  (format-time-string "%A, %d/%m %Y" time)))))
+          (insert (format "### %s\n\n" (or formatted-date "")))
+          (insert (format "- %s\n\n" task-text))))
+      
+      ;; Save Markdown to file silently
+      (write-region (point-min) (point-max) markdown-file nil t))
+    
+    ;; Schedule next report
+    (task-manager-schedule-auto-report)))
+
+;; Schedule the first automatic report when the file is loaded
+(add-hook 'after-init-hook 'task-manager-schedule-auto-report)
+
+;; Add this function after task-manager-parse-date-from-task
+
+(defun task-manager-sort-tasks-by-due-date (tasks)
+  "Sort TASKS by their due dates. Tasks without due dates are placed at the end."
+  (sort tasks
+        (lambda (a b)
+          (let ((date-a (task-manager-parse-date-from-task a))
+                (date-b (task-manager-parse-date-from-task b)))
+            (cond
+             ;; If both tasks have dates, compare them
+             ((and date-a date-b)
+              (string< date-a date-b))
+             ;; If only first task has date, it comes first
+             (date-a t)
+             ;; If only second task has date, it comes first
+             (date-b nil)
+             ;; If neither has date, maintain original order
+             (t nil))))))
 
 (provide 'task-manager2)
 
