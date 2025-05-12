@@ -115,7 +115,7 @@
   :host "openrouter.ai"
   :endpoint "/api/v1/chat/completions"
   :stream t
-  :key "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"
+  :key "your secret api key"
   :models '(deepseek/deepseek-chat-v3-0324:free
             deepseek/deepseek-r1:free
             meta-llama/llama-4-maverick:free
