@@ -100,12 +100,22 @@
  (setq default-directory "~/.emacs.d/my-org-files/")
  (setq command-line-default-directory "~/.emacs.d/my-org-files/")
 
+
+
+;; rewrite
+(setq gptel-rewrite-default-action 'accept) ;; or 'merge, 'diff, etc.
+
+
+
+;; google translate
+ ;; (global-set-key (kbd "C-c ñ") 'google-translate-region)
+
 ;; Openrouter gptel
 (gptel-make-openai "OpenRouter"
   :host "openrouter.ai"
   :endpoint "/api/v1/chat/completions"
   :stream t
-  :key "your secret key"
+  :key "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"
   :models '(deepseek/deepseek-chat-v3-0324:free
             deepseek/deepseek-r1:free
             meta-llama/llama-4-maverick:free
@@ -2627,7 +2637,7 @@ If a region is selected, prompt for additional input and pass it as a query."
   :ensure t
   :config
   ;; Set API key directly (remove auth-sources)
-  (setq gptel-api-key "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")  ; Replace with your actual API key
+  (setq gptel-api-key "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")  ; Replace with your actual API key
 
   ;; Set default model and available models
   (setq gptel-model "gpt-4o-mini")  ; Set GPT-4-0-mini as default
@@ -2643,7 +2653,7 @@ If a region is selected, prompt for additional input and pass it as a query."
   (global-set-key (kbd "C-x s") 'gptel-send)
   (global-set-key (kbd "C-c M-g") 'gptel))
 
-;; gptel openrouter
+
 
 ;; reload init file
 (defun reload-init-file ()
