@@ -1,2858 +1,3219 @@
-;; Author: Rahul Martim Juliato
-;; URL: https://github.com/LionyxML/emacs-solo
-;; Package-Requires: ((emacs "30.1"))
-;; Keywords: config
-
-
-;;; -------------------- GENERAL EMACS CONFIG
-;;; EMACS
-(use-package emacs
-  :ensure nil
-  :bind
-  (("M-o" . other-window)
-   ("C-g" . keyboard-quit)  ; Ensure C-g is bound to keyboard-quit
-   ("M-g r" . recentf)
-   ("M-s g" . grep)
-   ("M-s f" . find-name-dired)
-   ("C-x C-b" . ibuffer)
-   ("C-x w t"  . transpose-window-layout)            ; EMACS-31
-   ("C-x w r"  . rotate-windows)                     ; EMACS-31
-   ("C-x w f h"  . flip-window-layout-horizontally)  ; EMACS-31
-   ("C-x w f v"  . flip-window-layout-vertically)    ; EMACS-31
-   ("RET" . newline-and-indent)
-   ("C-z" . nil)
-   ("C-x C-z" . nil)
-   ("C-x C-k RET" . nil))
-  :custom
-  (ad-redefinition-action 'accept)
-  (column-number-mode nil)
-  (line-number-mode nil)
-  (completion-ignore-case t)
-  (completions-detailed t)
-  (delete-by-moving-to-trash t)
-  (display-line-numbers-width 3)
-  (display-line-numbers-widen t)
-  (delete-selection-mode 1)
-  (enable-recursive-minibuffers t)
-  (find-ls-option '("-exec ls -ldh {} +" . "-ldh"))  ; find-dired results with human readable sizes
-  (frame-resize-pixelwise t)
-  (global-auto-revert-non-file-buffers t)
-  (help-window-select t)
-  (history-length 300)
-  (inhibit-startup-message t)
-  (initial-scratch-message "")
-  (ispell-dictionary "en_US")
-  (kill-do-not-save-duplicates t)
-  (create-lockfiles nil)   ; No backup files
-  (make-backup-files nil)  ; No backup files
-  (backup-inhibited t)     ; No backup files
-  (pixel-scroll-precision-mode t)
-  (pixel-scroll-precision-use-momentum nil)
-  (ring-bell-function 'ignore)
-  (read-answer-short t)
-  (recentf-max-saved-items 300) ; default is 20
-  (recentf-max-menu-items 15)
-  (recentf-auto-cleanup (if (daemonp) 300 'never))
-  (recentf-exclude (list "^/\\(?:ssh\\|su\\|sudo\\)?:"))
-  (remote-file-name-inhibit-delete-by-moving-to-trash t)
-  (remote-file-name-inhibit-auto-save t)
-  (resize-mini-windows 'grow-only)
-  (ring-bell-function #'ignore)
-  (scroll-conservatively 8)
-  (scroll-margin 5)
-  (savehist-save-minibuffer-history t)    ; t is default
-  (savehist-additional-variables
-   '(kill-ring                            ; clipboard
-     register-alist                       ; macros
-     mark-ring global-mark-ring           ; marks
-     search-ring regexp-search-ring))     ; searches
-  (save-place-file (expand-file-name "saveplace" user-emacs-directory))
-  (save-place-limit 600)
-  (set-mark-command-repeat-pop t) ; So we can use C-u C-SPC C-SPC C-SPC... instead of C-u C-SPC C-u C-SPC...
-  (split-width-threshold 170)     ; So vertical splits are preferred
-  (split-height-threshold nil)
-  (shr-use-colors nil)
-  (switch-to-buffer-obey-display-actions t)
-  (tab-always-indent 'complete)
-  (tab-width 4)
-  (tab-bar-close-button-show nil)
-  (tab-bar-new-button-show nil)
-  (tab-bar-tab-hints t)
-  (treesit-font-lock-level 4)
-  (truncate-lines t)
-  (undo-limit (* 13 160000))
-  (undo-strong-limit (* 13 240000))
-  (undo-outer-limit (* 13 24000000))
-  (use-dialog-box nil)
-  (use-file-dialog nil)
-  (use-short-answers t)
-  (visible-bell nil)
-  (window-combination-resize t)
-  (window-resize-pixelwise nil)
-  (xref-search-program 'ripgrep)
-  (grep-command "rg -nS --no-heading ")
-  (grep-find-ignored-directories
-   '("SCCS" "RCS" "CVS" "MCVS" ".src" ".svn" ".git" ".hg" ".bzr" "_MTN" "_darcs" "{arch}" "node_modules" "build" "dist"))
-  :config
-  ;; Makes everything accept utf-8 as default, so buffers with tsx and so
-  ;; won't ask for encoding (because undecided-unix) every single keystroke
-  (modify-coding-system-alist 'file "" 'utf-8)
- (setq default-directory "~/.emacs.d/my-org-files/")
- (setq command-line-default-directory "~/.emacs.d/my-org-files/")
-
-
-
-;; rewrite
-(setq gptel-rewrite-default-action 'accept) ;; or 'merge, 'diff, etc.
-
-
-
-;; google translate
- ;; (global-set-key (kbd "C-c ñ") 'google-translate-region)
-
-;; Openrouter gptel
-(gptel-make-openai "OpenRouter"
-  :host "openrouter.ai"
-  :endpoint "/api/v1/chat/completions"
-  :stream t
-  :key "your secret api key"
-  :models '(deepseek/deepseek-chat-v3-0324:free
-            deepseek/deepseek-r1:free
-            meta-llama/llama-4-maverick:free
-            meta-llama/llama-4-scout:free
-            meta-llama/llama-3.3-70b-instruct:free
-            meta-llama/llama-3.2-11b-vision-instruct:free
-            microsoft/mai-ds-r1:free
-            qwen/qwen3-30b-a3b:free
-            nvidia/llama-3.1-nemotron-ultra-253b-v1:free
-            google/gemini-2.5-pro-preview-03-25
-            google/gemini-2.5-flash-preview
-            google/gemini-2.0-flash-exp:free))
-
-;; disable fringe mode
-(fringe-mode -1)
-
-
-
-;; borrar hast setface
-  (defvar bootstrap-version)
-(let ((bootstrap-file
-       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
-      (bootstrap-version 7))
-  (unless (file-exists-p bootstrap-file)
-    (with-current-buffer
-        (url-retrieve-synchronously
-         "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
-         'silent 'inhibit-cookies)
-      (goto-char (point-max))
-      (eval-print-last-sexp)))
-  (load bootstrap-file nil 'nomessage))
-
-
-  ;; (set-face-attribute 'default nil :family "RobotoMono Nerd Font" :height 105)
-  (set-face-attribute 'default nil :family "RobotoMono Nerd Font" :height 200 :weight 'regular)
-
-  (when (eq system-type 'darwin)
-    (setq insert-directory-program "gls")
-    (setq mac-command-modifier 'meta)
-    (set-face-attribute 'default nil :family "RobotoMono Nerd Font" :height 220))
-
-  ;; Save manual customizations to other file than init.el
-  (setq custom-file (locate-user-emacs-file "custom-vars.el"))
-  (load custom-file 'noerror 'nomessage)
-
-;; Task Manager Configuration
-(add-to-list 'load-path (expand-file-name "~/.emacs.d/lisp/task-manager"))
-(require 'task-manager2)
-(add-hook 'emacs-startup-hook 'task-manager2-init)
-(global-set-key (kbd "C-c t") 'task-manager2-init)
-
-;; buscar imágenes
-(defun buscar-imagenes (palabra)
-  "Buscar imágenes de PALABRA en Google e iniciar el navegador."
-  (interactive "sBuscar imágenes de: ")
-  (browse-url (concat "https://www.google.com/search?tbm=isch&q=" (url-hexify-string palabra))))
-
-;; visual line mode
-;; Enable Visual Line mode globally
-(global-visual-line-mode 1)
-
-;; Optional: make it look better
-(setq visual-line-fringe-indicators '(left-curly-arrow right-curly-arrow))
-(setq-default word-wrap t)
-(setq-default truncate-lines nil)
-
-  ;; Set line-number-mode with relative numbering
-;;  (setq display-line-numbers-type 'relative)
-;;  (add-hook 'prog-mode-hook #'display-line-numbers-mode)
-  ;; Enable global line numbers
-
-;; Enable Global Tab Line mode at startup - add this near the top of init.el
-(global-tab-line-mode 1)  ; Use 1 instead of t to ensure it's enabled
-(setq global-tab-line-mode t)  ; Make sure it stays enabled
-
-
-
-;; Add this to your existing use-package emacs block, in the :init section
-(use-package emacs
-  :init
-  (global-tab-line-mode 1)
-  ;; ... rest of your init configuration ...
-  )
-
-
-  ;; A Protesilaos life savier HACK
-  ;; Add option "d" to whenever using C-x s or C-x C-c, allowing a quick preview
-  ;; of the diff (if you choose `d') of what you're asked to save.
-  (add-to-list 'save-some-buffers-action-alist
-               (list "d"
-                     (lambda (buffer) (diff-buffer-with-file (buffer-file-name buffer)))
-                     "show diff between the buffer and its file"))
-
-  ;; On Terminal: changes the vertical separator to a full vertical line
-  ;;              and truncation symbol to a right arrow
-  (set-display-table-slot standard-display-table 'vertical-border ?\u2502)
-  (set-display-table-slot standard-display-table 'truncation ?\u2192)
-
-  ;; Ibuffer filters
-  (setq ibuffer-saved-filter-groups
-        '(("default"
-           ("org" (or
-                   (mode . org-mode)
-                   (name . "^\\*Org Src")
-                   (name . "^\\*Org Agenda\\*$")))
-           ("tramp" (name . "^\\*tramp.*"))
-           ("emacs" (or
-                     (name . "^\\*scratch\\*$")
-                     (name . "^\\*Messages\\*$")
-                     (name . "^\\*Warnings\\*$")
-                     (name . "^\\*Shell Command Output\\*$")
-                     (name . "^\\*Async-native-compile-log\\*$")
-                     (name . "^\\*straight-")))
-           ("ediff" (or
-                     (name . "^\\*ediff.*")
-                     (name . "^\\*Ediff.*")))
-           ("dired" (mode . dired-mode))
-           ("terminal" (or
-                        (mode . term-mode)
-                        (mode . shell-mode)
-                        (mode . eshell-mode)))
-           ("help" (or
-                    (name . "^\\*Help\\*$")
-                    (name . "^\\*info\\*$")
-                    (name . "^\\*helpful"))))))
-  (add-hook 'ibuffer-mode-hook
-            (lambda ()
-              (ibuffer-switch-to-saved-filter-groups "default")))
-  (setq ibuffer-show-empty-filter-groups nil) ; don't show empty groups
-
-
-  ;; So eshell git commands open an instance of THIS config of Emacs
-  (setenv "GIT_EDITOR" (format "emacs --init-dir=%s " (shell-quote-argument user-emacs-directory)))
-  ;; So rebase from eshell opens with a bit of syntax highlight
-  (add-to-list 'auto-mode-alist '("/git-rebase-todo\\'" . conf-mode))
-
-
-  ;; Runs 'private.el' after Emacs inits
-  (add-hook 'after-init-hook
-            (lambda ()
-              (let ((private-file (expand-file-name "private.el" user-emacs-directory)))
-                (when (file-exists-p private-file)
-                  (load private-file)))))
-
-  :init
-  (set-window-margins (selected-window) 2 0)
-
-  (toggle-frame-maximized)
-  (select-frame-set-input-focus (selected-frame))
-  (global-auto-revert-mode 1)
-  (indent-tabs-mode -1)
-  (recentf-mode 1)
-  (repeat-mode 1)
-  (savehist-mode 1)
-  (save-place-mode 1)
-  (winner-mode)
-  (xterm-mouse-mode 1)
-  (file-name-shadow-mode 1) ; allows us to type a new path without having to delete the current one
-
-  (with-current-buffer (get-buffer-create "*scratch*")
-    (insert (format ";;
-;;   Loading time : %s
-;;   Packages     : %s
-"
-                    (emacs-init-time)
-                    (number-to-string (length package-activated-list)))))
-
-  (message (emacs-init-time)))
-
-
-;;; AUTH-SOURCE
-;; (use-package auth-source
-;;   :ensure nil
-;;   :defer t
-;;   :config
-;;   (setq auth-sources
-;;         (list (expand-file-name ".authinfo.gpg" user-emacs-directory)))
-;;   (setq user-full-name "Rahul Martim Juliato"
-;;         user-mail-address "rahul.juliato@gmail.com")
-
-;;   ;; Use `pass` as an auth-source
-;;   (when (file-exists-p "~/.password-store")
-;;     (auth-source-pass-enable)))
-
-
-;;; CONF
-(use-package conf-mode
-  :ensure nil
-  :mode ("\\.env\\..*\\'" "\\.env\\'")
-  :init
-  (add-to-list 'auto-mode-alist '("\\.env\\'" . conf-mode)))
-
-
-
-;;; WINDOW
-(use-package window
-  :ensure nil
-  :custom
-  (display-buffer-alist
-   '(
-     ("\\*container\\*"
-      (display-buffer-in-side-window)
-      (window-width . 120)
-      (side . left)
-      (slot . -1))
-     ("\\*\\(Backtrace\\|Warnings\\|Compile-Log\\|Messages\\|Bookmark List\\|Occur\\|eldoc\\)\\*"
-      (display-buffer-in-side-window)
-      (window-height . 0.25)
-      (side . bottom)
-      (slot . 0))
-     ("\\*\\([Hh]elp\\)\\*"
-      (display-buffer-in-side-window)
-      (window-width . 75)
-      (side . right)
-      (slot . 0))
-     ("\\*\\(Ibuffer\\)\\*"
-      (display-buffer-in-side-window)
-      (window-width . 100)
-      (side . right)
-      (slot . 1))
-     ("\\*\\(Flymake diagnostics\\|xref\\|Completions\\)"
-      (display-buffer-in-side-window)
-      (window-height . 0.25)
-      (side . bottom)
-      (slot . 1))
-     ("\\*\\(grep\\|find\\)\\*"
-      (display-buffer-in-side-window)
-      (window-height . 0.25)
-      (side . bottom)
-      (slot . 2))
-     )))
-
-
-
-;;; ICOMPLETE
-(use-package icomplete
-  :bind (:map icomplete-minibuffer-map
-              ("C-n" . icomplete-forward-completions)
-              ("C-p" . icomplete-backward-completions)
-              ("C-v" . icomplete-vertical-toggle)
-              ("RET" . icomplete-force-complete-and-exit)
-              ("C-j" . exit-minibuffer)) ;; So we can exit commands like `multi-file-replace-regexp-as-diff'
-  :hook
-  (after-init . (lambda ()
-                  (fido-mode -1)
-                  (icomplete-vertical-mode 1)))
-  :config
-  (setq icomplete-delay-completions-threshold 0)
-  (setq icomplete-compute-delay 0)
-  (setq icomplete-show-matches-on-no-input t)
-  (setq icomplete-hide-common-prefix nil)
-  (setq icomplete-prospects-height 10)
-  (setq icomplete-separator " . ")
-  (setq icomplete-with-completion-tables t)
-  (setq icomplete-in-buffer t)
-  (setq icomplete-max-delay-chars 0)
-  (setq icomplete-scroll t)
-
-  ;; EMACS-31
-  (when (and (>= emacs-major-version 31)
-             (boundp 'icomplete-vertical-in-buffer-adjust-list))
-
-             (setq icomplete-vertical-in-buffer-adjust-list t)
-             (setq icomplete-vertical-render-prefix-indicator t)
-             ;; (setq icomplete-vertical-selected-prefix-indicator   " @ ")
-             ;; (setq icomplete-vertical-unselected-prefix-indicator "   ")
-             )
-
-  (if icomplete-in-buffer
-      (advice-add 'completion-at-point
-                  :after #'minibuffer-hide-completions))
-
-  ;; https://lists.gnu.org/archive/html/bug-gnu-emacs/2025-03/msg02638.html
-  ;;
-  ;; I'm currently proposing these features on bug#75784 (bug-gnu-emacs).
-  ;; If they get accepted we can get rid of this giant block.
-  ;;
-  ;; === FIXME: I'm reviewing it to the icomplete PATCH
-
-  ;; EMACS-31
-  (when (or (< emacs-major-version 31)
-            (not (boundp 'icomplete-vertical-in-buffer-adjust-list)))
-
-    (defface icomplete-vertical-selected-prefix-indicator-face
-      '((t :inherit font-lock-keyword-face :weight bold :foreground "cyan"))
-      "Face used for the prefix set by `icomplete-vertical-selected-prefix-indicator'."
-      :group 'icomplete
-      :version "31.1")
-
-    (defface icomplete-vertical-unselected-prefix-indicator-face
-      '((t :inherit font-lock-keyword-face :weight normal :foreground "gray"))
-      "Face used for the prefix set by `icomplete-vertical-unselected-prefix-indicator'."
-      :group 'icomplete
-      :version "31.1")
-
-    (defcustom icomplete-vertical-in-buffer-adjust-list t
-      "Control whether in-buffer completion should align the cursor position.
-If this is t and `icomplete-in-buffer' is t, and `icomplete-vertical-mode'
-is activated, the in-buffer vertical completions are shown aligned to the
-cursor position when the completion started, not on the first column, as
-the default behaviour."
-      :type 'boolean
-      :group 'icomplete
-      :version "31.1")
-
-    (defcustom icomplete-vertical-render-prefix-indicator t
-      "Control whether a indicator is added as a prefix to each candidate.
-If this is t and `icomplete-vertical-mode' is activated, a indicator,
-controlled by `icomplete-vertical-selected-prefix-indicator' is shown
-as a prefix to the current under selection candidate, while the
-remaining of the candidates will receive the indicator controlled
-by `icomplete-vertical-unselected-prefix-indicator'."
-      :type 'boolean
-      :group 'icomplete
-      :version "31.1")
-
-    (defcustom icomplete-vertical-selected-prefix-indicator "» "
-      "Prefix string used to mark the selected completion candidate.
-If `icomplete-vertical-render-prefix-indicator' is t, the string
-defined here is used as a prefix of the currently selected entry in the
-list.  It can be further customized by the face
-`icomplete-vertical-selected-prefix-indicator-face'."
-      :type 'string
-      :group 'icomplete
-      :version "31.1")
-
-    (defcustom icomplete-vertical-unselected-prefix-indicator "  "
-      "Prefix string used on the unselected completion candidates.
-If `icomplete-vertical-render-prefix-indicator' is t, the string
-defined here is used as a prefix for all unselected entries in the list.
-list.  It can be further customized by the face
-`icomplete-vertical-unselected-prefix-indicator-face'."
-      :type 'string
-      :group 'icomplete
-      :version "31.1")
-
-    ;; FIXME: make this into PATCH - OK
-    (defun icomplete-vertical--adjust-lines-for-column (lines buffer data)
-      "Adjust the LINES to align with the column in BUFFER based on DATA."
-      (if icomplete-vertical-in-buffer-adjust-list
-          (let* ((column (current-column))
-                 (prefix-indicator-width
-                  (if icomplete-vertical-render-prefix-indicator
-                      (max (length icomplete-vertical-selected-prefix-indicator)
-                           (length icomplete-vertical-unselected-prefix-indicator))
-                    0))
-                 (wrapped-line (with-current-buffer buffer
-                                 (save-excursion
-                                   (goto-char (car data))
-                                   (beginning-of-line)
-                                   (count-screen-lines (point) (car data)))))
-                 (window-width (+ (window-hscroll) (window-body-width)))
-                 (longest-line-width (apply #'max (mapcar #'length lines)))
-                 (spaces-to-add
-                  (if (> wrapped-line 1)
-                      (- column (* (- wrapped-line 1) (- window-width 5)))
-                    column))
-                 (spaces-to-add-avoiding-scrolling
-                  (if (>= (+ spaces-to-add longest-line-width prefix-indicator-width) window-width)
-                      (- spaces-to-add longest-line-width)
-                    spaces-to-add)))
-
-            (mapcar (lambda (line)
-                      (concat (make-string spaces-to-add-avoiding-scrolling ?\s) line))
-                    lines))
-        lines))
-
-    ;; FIXME: what to demo/test:
-    ;;
-    ;; This patch provides two more new features, which improves icomplete-vertical-mode, 1 and 2,
-    ;; explained below:
-    ;;
-    ;;
-    ;; 1.) Improve feature provided by `icomplete-in-buffer'.
-    ;;     If user, besides setting `icomplete-in-buffer' to t, also set the
-    ;;     new `icomplete-vertical-in-buffer-adjust-list' to t, the following are fixed/ improved:
-    ;;
-    ;; Without the new `icomplete-vertical-in-buffer-adjust-list':
-    ;; - [ ] wrapped lines   - completion candidates on different columns always shows candidates at column 0
-    ;; - [ ] wrapped lines   - completion candidates on different lines always shows candidates at column 0
-    ;; - [ ] wrapped lines   - completion candidates close to the end of buffer won't be printed
-    ;; - [ ] truncated lines - completion candidates on different columns always shows candidates at column 0
-    ;; - [ ] truncated lines - completion candidates on horizontally scrolled windows won't appear on buffer
-    ;;                         as they're on column 0
-    ;; - [ ] truncated lines - completion candidates close to the end of buffer wont be shown
-    ;;
-    ;;
-    ;; With the new `icomplete-vertical-in-buffer-adjust-list':
-    ;; - [ ] wrapped lines   - fix    : completion candidates on different columns will always be printed
-    ;;                                  under the cursor
-    ;; - [ ] wrapped lines   - feature: completion candidates on different columns close to the end
-    ;;                                  of the buffer will adjust so they stay visible
-    ;; - [ ] wrapped lines   - fix:   : completion candidates on different lines always be printed under
-    ;;                                  the cursor
-    ;; - [ ] wrapped lines   - fix    : if icomplete-prospects-height won't fit from current line to the
-    ;;                                  end of vertical space, our window will be scrolled so we have at
-    ;;                                  least this amount of lines. This ensures our candidates list is
-    ;;                                  always visible
-    ;; - [ ] truncated lines - fix    : completion candidates on different columns will always be printed
-    ;;                                  under the cursor
-    ;; - [ ] truncated lines - feature: completion candidates on different columns close to the end
-    ;;                                  of the buffer will adjust so they stay visible even when we scroll
-    ;;                                  horizontally
-    ;; - [ ] truncated lines - feature: completion candidates on horizontally scrolled windows will be
-    ;;                                  printed under the cursor
-    ;; - [ ] wrapped lines   - feature: if icomplete-prospects-height won't fit from current line to the
-    ;;                                  end of vertical space, our window will be scrolled so we have at
-    ;;                                  least this amount of lines. This ensures our candidates list is
-    ;;                                  always visible
-    ;; - [ ] from wrapped    - feature: if we are on wrapped lines and manually horiontal scroll, the lines
-    ;;       to truncated               will become automatically truncated, in this case, all the features
-    ;;                                  above still works from either mode (wrapped or truncated).
-    ;;
-    ;;
-    ;; 2.) Implements new feature which provides customizable prefix indicators
-    ;;
-    ;; Setting `icomplete-vertical-render-prefix-indicator' to t will provide a prefix indicator
-    ;; to indicate the current selected candidate, by default "» ".
-    ;;
-    ;; This prefix is customizable through the variable `icomplete-vertical-selected-prefix-indicator'
-    ;; and de face `icomplete-vertical-selected-prefix-indicator-face'.
-    ;;
-    ;; Users can also customize an indicator to the not selected candidates trhough the use of
-    ;; the variable `icomplete-vertical-unselected-prefix-indicator', by default: "  ", and the face
-    ;; `icomplete-vertical-unselected-prefix-indicator-face'.
-    ;;
-
-    ;; set margins buffer
-(setq left-margin-width 3
-      right-margin-width 3)
-(set-window-buffer (selected-window) (current-buffer))
-
-
-    ;; FIXME: remove this after patch
-    (defun icomplete-vertical--ensure-visible-lines-inside-buffer ()
-      "Ensure the completion list is visible in regular buffers only.
-Scrolls the screen to be at least `icomplete-prospects-height' real lines
-away from the bottom.  Counts wrapped lines as real lines."
-      (unless (minibufferp)
-        (let* ((window-height (window-body-height))
-               (current-line (count-screen-lines (window-start) (point)))
-               (lines-to-bottom (- window-height current-line)))
-          (when (< lines-to-bottom icomplete-prospects-height)
-            (scroll-up (- icomplete-prospects-height lines-to-bottom))))))
-
-
-    (defun icomplete-vertical--add-indicator-to-selected (comp)
-      "Add indicators to the selected/unselected COMP completions."
-      (if (and icomplete-vertical-render-prefix-indicator
-               (get-text-property 0 'icomplete-selected comp))
-          (concat (propertize icomplete-vertical-selected-prefix-indicator
-                              'face 'icomplete-vertical-selected-prefix-indicator-face)
-                  comp)
-        (concat (propertize icomplete-vertical-unselected-prefix-indicator
-                            'face 'icomplete-vertical-unselected-prefix-indicator-face)
-                comp)))
-
-
-    (cl-defun icomplete--render-vertical
-        (comps md &aux scroll-above scroll-below
-               (total-space ; number of mini-window lines available
-                (1- (min
-                     icomplete-prospects-height
-                     (truncate (max-mini-window-lines) 1)))))
-      ;; Welcome to loopapalooza!
-      ;;
-      ;; First, be mindful of `icomplete-scroll' and manual scrolls.  If
-      ;; `icomplete--scrolled-completions' and `icomplete--scrolled-past'
-      ;; are:
-      ;;
-      ;; - both nil, there is no manual scroll;
-      ;; - both non-nil, there is a healthy manual scroll that doesn't need
-      ;;   to be readjusted (user just moved around the minibuffer, for
-      ;;   example);
-      ;; - non-nil and nil, respectively, a refiltering took place and we
-      ;;   may need to readjust them to the new filtered `comps'.
-      (when (and icomplete-scroll                                    ;; FIXME: remove this after patch
-                 (not icomplete--scrolled-completions)
-                 (not icomplete--scrolled-past))
-        (icomplete-vertical--ensure-visible-lines-inside-buffer))
-      (when (and icomplete-scroll
-                 icomplete--scrolled-completions
-                 (null icomplete--scrolled-past))
-        (icomplete-vertical--ensure-visible-lines-inside-buffer)     ;; FIXME: remove this after patch
-        (cl-loop with preds
-                 for (comp . rest) on comps
-                 when (equal comp (car icomplete--scrolled-completions))
-                 do
-                 (setq icomplete--scrolled-past preds
-                       comps (cons comp rest))
-                 (completion--cache-all-sorted-completions
-                  (icomplete--field-beg)
-                  (icomplete--field-end)
-                  comps)
-                 and return nil
-                 do (push comp preds)
-                 finally (setq icomplete--scrolled-completions nil)))
-      ;; Then, in this pretty ugly loop, collect completions to display
-      ;; above and below the selected one, considering scrolling
-      ;; positions.
-      (cl-loop with preds = icomplete--scrolled-past
-               with succs = (cdr comps)
-               with space-above = (- total-space
-                                     1
-                                     (cl-loop for (_ . r) on comps
-                                              repeat (truncate total-space 2)
-                                              while (listp r)
-                                              count 1))
-               repeat total-space
-               for neighbor = nil
-               if (and preds (> space-above 0)) do
-               (push (setq neighbor (pop preds)) scroll-above)
-               (cl-decf space-above)
-               else if (consp succs) collect
-               (setq neighbor (pop succs)) into scroll-below-aux
-               while neighbor
-               finally (setq scroll-below scroll-below-aux))
-      ;; Halfway there...
-      (let* ((selected (propertize (car comps) 'icomplete-selected t))
-             (chosen (append scroll-above (list selected) scroll-below))
-             (tuples (icomplete--augment md chosen))
-             max-prefix-len max-comp-len lines nsections)
-        (add-face-text-property 0 (length selected)
-                                'icomplete-selected-match 'append selected)
-        ;; Figure out parameters for horizontal spacing
-        (cl-loop
-         for (comp prefix) in tuples
-         maximizing (length prefix) into max-prefix-len-aux
-         maximizing (length comp) into max-comp-len-aux
-         finally (setq max-prefix-len max-prefix-len-aux
-                       max-comp-len max-comp-len-aux))
-        ;; Serialize completions and section titles into a list
-        ;; of lines to render
-        (cl-loop
-         for (comp prefix suffix section) in tuples
-         when section
-         collect (propertize section 'face 'icomplete-section) into lines-aux
-         and count 1 into nsections-aux
-         for comp = (icomplete-vertical--add-indicator-to-selected comp)
-         when (get-text-property 0 'icomplete-selected comp)
-         do (add-face-text-property 0 (length comp)
-                                    'icomplete-selected-match 'append comp)
-         collect (concat prefix
-                         (make-string (max 0 (- max-prefix-len (length prefix))) ? )
-                         (completion-lazy-hilit comp)
-                         (make-string (max 0 (- max-comp-len (length comp))) ? )
-                         suffix)
-         into lines-aux
-         finally (setq lines lines-aux
-                       nsections nsections-aux))
-        ;; Kick out some lines from the beginning due to extra sections.
-        ;; This hopes to keep the selected entry more or less in the
-        ;; middle of the dropdown-like widget when `icomplete-scroll' is
-        ;; t.  Funky, but at least I didn't use `cl-loop'
-        (setq lines
-              (nthcdr
-               (cond ((<= (length lines) total-space) 0)
-                     ((> (length scroll-above) (length scroll-below)) nsections)
-                     (t (min (ceiling nsections 2) (length scroll-above))))
-               lines))
-        (when icomplete--in-region-buffer
-          (setq lines (icomplete-vertical--adjust-lines-for-column
-                       lines icomplete--in-region-buffer completion-in-region--data)))
-        ;; At long last, render final string return value.  This may still
-        ;; kick out lines at the end.
-        (concat " \n"
-                (cl-loop for l in lines repeat total-space concat l concat "\n")))))
-
-;; end use-package
-)
-;; api key for folder app
-;;(setq folder-index-llm-openai-key "kk-m3qFJtos6WMEG-6NwRM-ga80Q2E53EM1798AS8ZHR6Q")
-
-;;; DIRED
-(use-package dired
-  :ensure nil
-  :bind
-  (("M-i" . emacs-solo/window-dired-vc-root-left))
-  :custom
-  (dired-dwim-target t)
-  (dired-guess-shell-alist-user
-   '(("\\.\\(png\\|jpe?g\\|tiff\\)" "feh" "xdg-open" "open")
-     ("\\.\\(mp[34]\\|m4a\\|ogg\\|flac\\|webm\\|mkv\\)" "mpv" "xdg-open" "open")
-     (".*" "xdg-open" "open")))
-  (dired-kill-when-opening-new-dired-buffer t)
-  (dired-listing-switches "-al --group-directories-first")
-  (dired-omit-files "^\\.")                                ; with dired-omit-mode (C-x M-o)
-  (dired-hide-details-hide-absolute-location t)            ; EMACS-31
-  :init
-  (add-hook 'dired-mode-hook (lambda () (dired-omit-mode 1))) ;; Turning this ON also sets the C-x M-o binding.
-
-  (defun emacs-solo/dired-rsync-copy (dest)
-  "Copy marked files in Dired to DEST using rsync async, with real-time processing of output."
-  (interactive
-   (list (expand-file-name (read-file-name "rsync to: "
-                                           (dired-dwim-target-directory)))))
-  (let* ((files (dired-get-marked-files nil current-prefix-arg))
-         (command (append '("rsync" "-hPur") (mapcar #'shell-quote-argument files) (list (shell-quote-argument dest))))
-         (buffer (get-buffer-create "*rsync*")))
-    (with-current-buffer buffer
-      (erase-buffer)
-      (insert "Running rsync...\n"))
-
-    (defun rsync-process-filter (proc string)
-      (with-current-buffer (process-buffer proc)
-        (goto-char (point-max))
-        (insert string)
-        (goto-char (point-max))
-        (while (re-search-backward "\r" nil t)
-          (replace-match "\n" nil nil))))
-
-    (make-process
-     :name "dired-rsync"
-     :buffer buffer
-     :command command
-     :filter 'rsync-process-filter
-     :sentinel
-     (lambda (_proc event)
-       (when (string-match-p "finished" event)
-         (with-current-buffer buffer
-           (goto-char (point-max))
-           (insert "\n* rsync done *\n"))
-         (dired-revert)))
-     :stderr buffer)
-
-    (display-buffer buffer)
-    (message "rsync started...")))
-
-
-  (defun emacs-solo/window-dired-vc-root-left (&optional directory-path)
-    "Creates *Dired-Side* like an IDE side explorer"
-    (interactive)
-    (add-hook 'dired-mode-hook 'dired-hide-details-mode)
-
-    (let ((dir (if directory-path
-                   (dired-noselect directory-path)
-         (if (eq (vc-root-dir) nil)
-                     (dired-noselect default-directory)
-                   (dired-noselect (vc-root-dir))))))
-
-      (display-buffer-in-side-window
-       dir `((side . left)
-         (slot . 0)
-         (window-width . 30)
-         (window-parameters . ((no-other-window . t)
-                   (no-delete-other-windows . t)
-                   (mode-line-format . (" "
-                            "%b"))))))
-      (with-current-buffer dir
-    (let ((window (get-buffer-window dir)))
-          (when window
-            (select-window window)
-        (rename-buffer "*Dired-Side*")
-        )))))
-
-  (defun emacs-solo/window-dired-open-directory ()
-    "Open the current directory in *Dired-Side* side window."
-    (interactive)
-    (emacs-solo/window-dired-vc-root-left (dired-get-file-for-visit)))
-
-  (eval-after-load 'dired
-  '(progn
-     (define-key dired-mode-map (kbd "C-<return>") 'emacs-solo/window-dired-open-directory))))
-
-
-;;; WDIRED
-(use-package wdired
-  :ensure nil
-  :commands (wdired-change-to-wdired-mode)
-  :config
-  (setq wdired-allow-to-change-permissions t)
-  (setq wdired-create-parent-directories t))
-
-
-;;; ISEARCH
-(use-package isearch
-  :ensure nil
-  :config
-  (setq isearch-lazy-count t)
-  (setq lazy-count-prefix-format "(%s/%s) ")
-  (setq lazy-count-suffix-format nil)
-  (setq search-whitespace-regexp ".*?")
-
-  (defun isearch-copy-selected-word ()
-    "Copy the current `isearch` selection to the kill ring."
-    (interactive)
-    (when isearch-other-end
-      (let ((selection (buffer-substring-no-properties isearch-other-end (point))))
-        (kill-new selection)
-        (isearch-exit))))
-
-  ;; Bind `M-w` in isearch to copy the selected word, so M-s M-. M-w
-  ;; does a great job of 'copying the current word under cursor'.
-  (define-key isearch-mode-map (kbd "M-w") 'isearch-copy-selected-word))
-
-
-;;; VC
-(use-package vc
-  :ensure nil
-  :defer t
-  :config
-  (setopt
-   vc-git-diff-switches '("--patch-with-stat" "--histogram")  ;; add stats to `git diff'
-   vc-git-log-switches '("--stat")                            ;; add stats to `git log'
-   vc-git-log-edit-summary-target-len 50
-   vc-git-log-edit-summary-max-len 70
-   vc-git-print-log-follow t
-   vc-git-revision-complete-only-branches nil
-   vc-annotate-display-mode 'scale
-   add-log-keep-changes-together t
-   vc-make-backup-files nil)                                  ;; Do not backup version controlled files
-
-  (with-eval-after-load 'vc-annotate
-    (setopt vc-annotate-color-map
-          '((20 . "#c3e88d")
-            (40 . "#89DDFF")
-            (60 . "#82aaff")
-            (80 . "#676E95")
-            (100 . "#c792ea")
-            (120 . "#f78c6c")
-            (140 . "#79a8ff")
-            (160 . "#f5e0dc")
-            (180 . "#a6e3a1")
-            (200 . "#94e2d5")
-            (220 . "#89dceb")
-            (240 . "#74c7ec")
-            (260 . "#82aaff")
-            (280 . "#b4befe")
-            (300 . "#b5b0ff")
-            (320 . "#8c9eff")
-            (340 . "#6a81ff")
-            (360 . "#5c6bd7"))))
-
-  ;; This one is for editing commit messages
-  (require 'log-edit)
-  (setopt log-edit-confirm 'changed
-          log-edit-keep-buffer nil
-          log-edit-require-final-newline t
-          log-edit-setup-add-author nil)
-
-  ;; Removes the bottom window with modified files list
-  (remove-hook 'log-edit-hook #'log-edit-show-files)
-
-  (with-eval-after-load 'vc-dir
-    ;; In vc-git and vc-dir for git buffers, make (C-x v) a run git add, u run git
-    ;; reset, and r run git reset and checkout from head.
-    (defun emacs-solo/vc-git-command (verb fn)
-      "Execute a Git command with VERB as action description and FN as operation on files."
-      (let* ((fileset (vc-deduce-fileset t)) ;; Deduce fileset
-             (backend (car fileset))
-             (files (nth 1 fileset)))
-        (if (eq backend 'Git)
-            (progn
-              (funcall fn files)
-              (message "%s %d file(s)." verb (length files)))
-          (message "Not in a VC Git buffer."))))
-
-    (defun emacs-solo/vc-git-add (&optional revision vc-fileset comment)
-      (interactive "P")
-      (emacs-solo/vc-git-command "Staged" 'vc-git-register))
-
-    (defun emacs-solo/vc-git-reset (&optional revision vc-fileset comment)
-      (interactive "P")
-      (emacs-solo/vc-git-command "Unstaged"
-                                 (lambda (files) (vc-git-command nil 0 files "reset" "-q" "--"))))
-
-
-    ;; Bind S and U in vc-dir-mode-map
-    (define-key vc-dir-mode-map (kbd "S") #'emacs-solo/vc-git-add)
-    (define-key vc-dir-mode-map (kbd "U") #'emacs-solo/vc-git-reset)
-
-    ;; Bind S and U in vc-prefix-map for general VC usage
-    (define-key vc-prefix-map (kbd "S") #'emacs-solo/vc-git-add)
-    (define-key vc-prefix-map (kbd "U") #'emacs-solo/vc-git-reset)
-
-    ;; Bind g to hide up to date files after refreshing in vc-dir
-    (define-key vc-dir-mode-map (kbd "g")
-                (lambda () (interactive) (vc-dir-refresh) (vc-dir-hide-up-to-date)))
-
-
-    (defun emacs-solo/vc-git-visualize-status ()
-      "Show the Git status of files in the `vc-log` buffer."
-      (interactive)
-      (let* ((fileset (vc-deduce-fileset t))
-             (backend (car fileset))
-             (files (nth 1 fileset)))
-        (if (eq backend 'Git)
-            (let ((output-buffer "*Git Status*"))
-              (with-current-buffer (get-buffer-create output-buffer)
-                (read-only-mode -1)
-                (erase-buffer)
-                ;; Capture the raw output including colors using 'git status --color=auto'
-                (call-process "git" nil output-buffer nil "status" "-v")
-                (pop-to-buffer output-buffer)))
-          (message "Not in a VC Git buffer."))))
-
-    (define-key vc-dir-mode-map (kbd "V") #'emacs-solo/vc-git-visualize-status)
-    (define-key vc-prefix-map (kbd "V") #'emacs-solo/vc-git-visualize-status))
-
-  (defun emacs-solo/vc-git-reflog ()
-    "Show git reflog in a new buffer with ANSI colors and custom keybindings."
-    (interactive)
-    (let* ((root (vc-root-dir)) ;; Capture VC root before creating buffer
-           (buffer (get-buffer-create "*vc-git-reflog*")))
-      (with-current-buffer buffer
-        (setq-local vc-git-reflog-root root) ;; Store VC root as a buffer-local variable
-        (let ((inhibit-read-only t))
-          (erase-buffer)
-          (vc-git-command buffer nil nil
-                          "reflog"
-                          "--color=always"
-                          "--pretty=format:%C(yellow)%h%Creset %C(auto)%d%Creset %Cgreen%gd%Creset %s %Cblue(%cr)%Creset")
-          (goto-char (point-min))
-          (ansi-color-apply-on-region (point-min) (point-max)))
-
-        (let ((map (make-sparse-keymap)))
-          (define-key map (kbd "/") #'isearch-forward)
-          (define-key map (kbd "p") #'previous-line)
-          (define-key map (kbd "n") #'next-line)
-          (define-key map (kbd "q") #'kill-buffer-and-window)
-
-          (use-local-map map))
-
-        (setq buffer-read-only t)
-        (setq mode-name "Git-Reflog")
-        (setq major-mode 'special-mode))
-      (pop-to-buffer buffer)))
-  (global-set-key (kbd "C-x v R") 'emacs-solo/vc-git-reflog)
-
-
-  (defun emacs-solo/vc-pull-merge-current-branch ()
-  "Pull the latest change from origin for the current branch and display output in a buffer."
+;;; task-manager2.el --- Enhanced task manager -*- lexical-binding: t -*-
+
+;; Author: Assistant
+;; Keywords: task management, todo
+;; Version: 2.0
+;; Package-Requires: ((emacs "25.1") (org "9.3"))
+
+;;; Commentary:
+;; A comprehensive task manager with sections for Inbox, Today, Week, etc.
+;; Added functionalities: search, recurring tasks, priorities, reminders, tags, and export/import.
+;; 
+;; Key commands:
+;;  a: Add a single task
+;;  A: Add multiple tasks
+;;  k: Delete selected tasks (move to Archive)
+;;  K: Delete all tasks in a section
+;;  l: Duplicate task at cursor
+;;  L: Load tasks
+;;  m: Move selected tasks to another section
+;;  RET: Edit task at current position
+;;  z: Toggle expansion of all sections
+;;  S: Search tasks
+;;  s: Focus on Someday section
+;;  r: Set task as recurring (daily, weekly, monthly)
+;;  R: Clear recurring status
+;;  V: View all recurring tasks
+;;  F: Focus on Archive section
+;;  p: Move to previous task
+;;  n: Move to next task
+;;  d: Set due date
+;;  D: Clear due date
+;;  T: Add tags
+;;  t: Focus on Today section
+;;  w: Move task to Week section
+;;  W: Move all tasks from Inbox and Today to Week
+;;  o: Focus on Monday section
+;;  c: Focus on Calendar section
+;;  C: Toggle commands visibility
+;;  f: Filter tasks by properties
+;;  X: Set reminders
+;;  b: Bulk edit tasks
+;;  E: Export tasks (org, json, csv)
+;;  I: Import tasks
+;;  i: Focus on Inbox section
+;;  v: Save tasks
+;;  L: Load tasks
+;;  SPC: Toggle task selection
+;;  u: Undo (up to 15 operations)
+;;  n: Next task
+;;  O: Import tasks from org-agenda in a directory
+;;  e: List tasks with dates
+;;  M: Move all tasks from a section
+;;  N: Manage notes for a task
+;;  n: View notes for a task
+;; 
+;; Features:
+;;  - URLs and file paths in tasks are automatically clickable
+;;  - Automatic daily task migration from Today to Week at 3 AM
+;;  - Import tasks from org-agenda in a directory
+;; 
+;; To start: M-x task-manager2-init
+
+;;; Code:
+
+(require 'cl-lib)
+(require 'button)
+(require 'calendar)
+(require 'autorevert)
+(require 'org)
+(require 'browse-url)  ; Add this line to require browse-url
+
+(defvar task-manager-sections
+  '("Inbox" "Today" "Week" "Monday" "Calendar" "Someday" "Archive")
+  "List of sections for organizing tasks.")
+
+(defvar task-manager-tasks (make-hash-table :test 'equal)
+  "Hash table storing tasks for each section.")
+
+(defvar-local task-manager-selected-tasks nil
+  "List of currently selected tasks.")
+
+(defvar-local task-manager-expanded-sections (make-hash-table :test 'equal)
+  "Hash table tracking expanded/collapsed state of sections.")
+
+(defvar task-manager-save-file 
+  (expand-file-name "~/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/tasks.org")
+  "File where task manager data is saved.")
+
+;; Add commands visibility toggle variable
+(defvar-local task-manager-show-commands nil
+  "Whether to show commands in the task manager buffer.")
+
+;; Add undo system - history of task states
+(defvar task-manager-undo-history nil
+  "Stack to keep track of task states for undo functionality.")
+
+(defvar task-manager-undo-history-size 15
+  "Maximum number of states to keep in the undo history.")
+
+;; Define button types for links
+(define-button-type 'task-url-link
+  'action 'task-manager-browse-url-button
+  'follow-link t
+  'help-echo "Click to open this URL in browser"
+  'face 'link)
+
+(define-button-type 'task-file-link
+  'action 'task-manager-find-file-button
+  'follow-link t
+  'help-echo "Click to open this file"
+  'face 'link)
+
+(defvar task-manager-backup-directory
+  (expand-file-name "~/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/backups/")
+  "Directory to store task manager backups.")
+
+(defvar task-manager-backup-interval (* 2 60 60)  ; 2 hours in seconds
+  "Interval between automatic backups in seconds.")
+
+(defvar task-manager-last-backup-time 0
+  "Timestamp of the last backup.")
+
+(defvar task-manager-max-backups 3
+  "Maximum number of backup files to keep.")
+
+;; Add a hash table to store task notes
+(defvar task-manager-task-notes (make-hash-table :test 'equal)
+  "Hash table storing notes for each task.")
+
+(defun task-manager-get-task-at-point ()
+  "Get the task at the current point, returning a cons of (section . task)."
+  (let ((task-found nil)
+        (task-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+    
+    ;; Check if we're on a task line, accounting for possible note icon and section info
+    (when (string-match "^\\s-*\\[\\([X ]\\)\\]\\s-*\\(?:📝\\s-*\\)?\\(.*?\\)\\(?:\\s-*(in \\(.*\\))?\\)?$" task-line)
+      (let* ((task-text (match-string 2 task-line))
+             (section-info (match-string 3 task-line))
+             (section nil)
+             (original-task nil))
+        
+        ;; If we have section info from "Due Today", use that directly
+        (when section-info
+          (setq section section-info)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (dolist (full-task tasks)
+              (let ((stripped-task (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" full-task))
+                    (stripped-task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task-text)))
+                (when (string-match-p (regexp-quote (string-trim stripped-task-text)) (string-trim stripped-task))
+                  (setq original-task full-task)
+                  (setq task-found t))))))
+        
+        ;; If no section info or task not found, search in all sections
+        (unless task-found
+          (dolist (sec task-manager-sections)
+            (let ((tasks (gethash sec task-manager-tasks)))
+              (dolist (full-task tasks)
+                (let ((stripped-task (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" full-task))
+                      (stripped-task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task-text)))
+                  (when (string-match-p (regexp-quote (string-trim stripped-task-text)) (string-trim stripped-task))
+                    (setq section sec)
+                    (setq original-task full-task)
+                    (setq task-found t)))))))
+        
+        ;; Return a cons of (section . task) if found
+        (when task-found
+          (cons section original-task))))))
+
+(defun task-manager-find-task-section (task)
+  "Find the section that contains TASK."
+  (let ((section-found nil))
+    (dolist (section task-manager-sections)
+      (let ((tasks (gethash section task-manager-tasks)))
+        (when (and (not section-found) (member task tasks))
+          (setq section-found section))))
+    section-found))
+
+(defun task-manager-all-tasks ()
+  "Get a list of all tasks from all sections."
+  (let ((all-tasks nil))
+    (dolist (section task-manager-sections)
+      (setq all-tasks (append all-tasks (gethash section task-manager-tasks))))
+    all-tasks))
+
+(defun task-manager-clear-recurring ()
+  "Clear the recurring status from a task. If cursor is on a task, use that task."
   (interactive)
-  (let* ((branch (vc-git--symbolic-ref "HEAD"))
-         (buffer (get-buffer-create "*Git Pull Output*"))
-         (command (format "git pull origin %s" branch)))
-    (if branch
-        (progn
-          (with-current-buffer buffer
-            (erase-buffer)
-            (insert (format "$ %s\n\n" command))
-            (call-process-shell-command command nil buffer t))
-          (display-buffer buffer))
-      (message "Could not determine current branch."))))
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to clear recurring: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         ;; Remove any existing recurring tag
+         (new-task (replace-regexp-in-string "\\[Recurring: [^]]*\\]" "" task))
+         (new-task (string-trim new-task)))
+    
+    ;; Replace old task with new one
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Recurring status cleared.")))
 
+;;;###autoload
+(defun task-manager2-init ()
+  "Initialize the task manager."
+  (interactive)
+  (switch-to-buffer (get-buffer-create "*Task Manager*"))
+  (task-manager-mode)
+  (task-manager-load-tasks)
+  (task-manager-check-overdue-migration)
+  
+  ;; Initialize all sections as expanded
+  (dolist (section task-manager-sections)
+    (puthash section t task-manager-expanded-sections))
+  
+  (task-manager-refresh)
+  (task-manager-schedule-auto-migrate))
 
-  (defun emacs-solo/vc-browse-remote (&optional current-line)
-  "Open the repository's remote URL in the browser.
-If CURRENT-LINE is non-nil, point to the current branch, file, and line.
-Otherwise, open the repository's main page."
-  (interactive "P")
-  (let* ((remote-url (string-trim (vc-git--run-command-string nil "config" "--get" "remote.origin.url")))
-         (branch (string-trim (vc-git--run-command-string nil "rev-parse" "--abbrev-ref" "HEAD")))
-         (file (string-trim (file-relative-name (buffer-file-name) (vc-root-dir))))
-         (line (line-number-at-pos)))
-    (message "Opening remote on browser: %s" remote-url)
-    (if (and remote-url (string-match "\\(?:git@\\|https://\\)\\([^:/]+\\)[:/]\\(.+?\\)\\(?:\\.git\\)?$" remote-url))
-        (let ((host (match-string 1 remote-url))
-              (path (match-string 2 remote-url)))
-          ;; Convert SSH URLs to HTTPS (e.g., git@github.com:user/repo.git -> https://github.com/user/repo)
-          (when (string-prefix-p "git@" host)
-            (setq host (replace-regexp-in-string "^git@" "" host)))
-          ;; Construct the appropriate URL based on CURRENT-LINE
-          (browse-url
-           (if current-line
-               (format "https://%s/%s/blob/%s/%s#L%d" host path branch file line)
-             (format "https://%s/%s" host path))))
-      (message "Could not determine repository URL"))))
-  (global-set-key (kbd "C-x v B") 'emacs-solo/vc-browse-remote)
-  (global-set-key (kbd "C-x v o")
-                  '(lambda () (interactive) (emacs-solo/vc-browse-remote 1)))
+(define-derived-mode task-manager-mode special-mode "Task Manager"
+  "Major mode for task management."
+  (buffer-disable-undo)
+  (setq buffer-read-only t)
+  
+  ;; Create prefix keymaps for 'a', 'A', and 'o'
+  (let ((a-map (make-sparse-keymap))
+        (A-map (make-sparse-keymap))
+        (o-map (make-sparse-keymap)))
+    
+    ;; Define keys in the 'a' prefix map
+    (define-key a-map (kbd "i") 'task-manager-add-task-inbox)
+    (define-key a-map (kbd "t") 'task-manager-add-task-today)
+    (define-key a-map (kbd "w") 'task-manager-add-task-week)
+    (define-key a-map (kbd "m") 'task-manager-add-task-monday)
+    (define-key a-map (kbd "s") 'task-manager-add-task-someday)
+    (define-key a-map (kbd "c") 'task-manager-add-task-calendar)
+    
+    ;; Define keys in the 'A' prefix map
+    (define-key A-map (kbd "i") 'task-manager-add-multiple-tasks-inbox)
+    (define-key A-map (kbd "t") 'task-manager-add-multiple-tasks-today)
+    (define-key A-map (kbd "w") 'task-manager-add-multiple-tasks-week)
+    (define-key A-map (kbd "m") 'task-manager-add-multiple-tasks-monday)
+    (define-key A-map (kbd "s") 'task-manager-add-multiple-tasks-someday)
+    (define-key A-map (kbd "c") 'task-manager-add-multiple-tasks-calendar)
+    
+    ;; Define keys in the 'o' prefix map
+    (define-key o-map (kbd "i") 'task-manager-focus-inbox)
+    (define-key o-map (kbd "t") 'task-manager-focus-today)
+    (define-key o-map (kbd "w") 'task-manager-focus-week)
+    (define-key o-map (kbd "m") 'task-manager-focus-monday)
+    (define-key o-map (kbd "s") 'task-manager-focus-someday)
+    (define-key o-map (kbd "c") 'task-manager-focus-calendar)
+    (define-key o-map (kbd "a") 'task-manager-focus-archive)
+    
+    ;; Bind the prefix maps to 'a', 'A', and 'o'
+    (define-key task-manager-mode-map (kbd "a") a-map)
+    (define-key task-manager-mode-map (kbd "A") A-map)
+    (define-key task-manager-mode-map (kbd "o") o-map))
+  
+  ;; Set up other key bindings
+  (define-key task-manager-mode-map (kbd "RET") 'task-manager-edit-task-at-point)
+  (define-key task-manager-mode-map (kbd "b") 'task-manager-bulk-edit)
+  (define-key task-manager-mode-map (kbd "B") 'task-manager-manual-backup)
+  (define-key task-manager-mode-map (kbd "c") 'task-manager-move-to-calendar)
+  (define-key task-manager-mode-map (kbd "C") 'task-manager-toggle-commands)
+  (define-key task-manager-mode-map (kbd "d") 'task-manager-set-due-date)
+  (define-key task-manager-mode-map (kbd "D") 'task-manager-clear-due-date)
+  (define-key task-manager-mode-map (kbd "E") 'task-manager-export)
+  (define-key task-manager-mode-map (kbd "f") 'task-manager-filter-tasks)
+  (define-key task-manager-mode-map (kbd "g") 'task-manager-refresh)
+  (define-key task-manager-mode-map (kbd "i") 'task-manager-move-to-inbox)
+  (define-key task-manager-mode-map (kbd "I") 'task-manager-import)
+  (define-key task-manager-mode-map (kbd "k") 'task-manager-delete-tasks)
+  (define-key task-manager-mode-map (kbd "K") 'task-manager-delete-section-tasks)
+  (define-key task-manager-mode-map (kbd "l") 'task-manager-duplicate-task)
+  (define-key task-manager-mode-map (kbd "L") 'task-manager-load-tasks)
+  (define-key task-manager-mode-map (kbd "m") 'task-manager-move-to-monday)
+  (define-key task-manager-mode-map (kbd "n") 'task-manager-next-task)
+  (define-key task-manager-mode-map (kbd "p") 'task-manager-previous-task)
+  (define-key task-manager-mode-map (kbd "q") 'kill-this-buffer)
+  (define-key task-manager-mode-map (kbd "r") 'task-manager-set-recurring)
+  (define-key task-manager-mode-map (kbd "R") 'task-manager-clear-recurring)
+  (define-key task-manager-mode-map (kbd "s") 'task-manager-move-to-someday)
+  (define-key task-manager-mode-map (kbd "S") 'task-manager-search-tasks)
+  (define-key task-manager-mode-map (kbd "t") 'task-manager-move-to-today)
+  (define-key task-manager-mode-map (kbd "T") 'task-manager-add-tags)
+  (define-key task-manager-mode-map (kbd "u") 'task-manager-undo)
+  (define-key task-manager-mode-map (kbd "v") 'task-manager-view-recurring)
+  (define-key task-manager-mode-map (kbd "w") 'task-manager-move-to-week)
+  (define-key task-manager-mode-map (kbd "W") 'task-manager-move-all-to-week)
+  (define-key task-manager-mode-map (kbd "x") 'task-manager-export)
+  (define-key task-manager-mode-map (kbd "X") 'task-manager-setting-reminders)
+  (define-key task-manager-mode-map (kbd "z") 'task-manager-collapse-all-sections)
+  (define-key task-manager-mode-map (kbd "SPC") 'task-manager-toggle-task-at-point))
 
+;; Add the undo keybinding explicitly after mode definition
+(define-key task-manager-mode-map (kbd "u") 'task-manager-undo)
 
-  (defun emacs-solo/vc-diff-on-current-hunk ()
-    "Show the diff for the current file and jump to the hunk containing the current line."
-    (interactive)
-    (let ((current-line (line-number-at-pos)))
-      (message "Current line in file: %d" current-line)
-      (vc-diff) ; Generate the diff buffer
-      (with-current-buffer "*vc-diff*"
-        (goto-char (point-min))
-        (let ((found-hunk nil))
-          (while (and (not found-hunk)
-                      (re-search-forward "^@@ -\\([0-9]+\\), *[0-9]+ \\+\\([0-9]+\\), *\\([0-9]+\\) @@" nil t))
-            (let* ((start-line (string-to-number (match-string 2)))
-                   (line-count (string-to-number (match-string 3)))
-                   (end-line (+ start-line line-count)))
-              (message "Found hunk: %d to %d" start-line end-line)
-              (when (and (>= current-line start-line)
-                         (<= current-line end-line))
-                (message "Current line %d is within hunk range %d to %d" current-line start-line end-line)
-                (setq found-hunk t)
-                (goto-char (match-beginning 0))))) ; Jump to the beginning of the hunk
-          (unless found-hunk
-            (message "Current line %d is not within any hunk range." current-line)
-            (goto-char (point-min)))))))
-  (global-set-key (kbd "C-x v =") 'emacs-solo/vc-diff-on-current-hunk))
+;; Add the clear due date keybinding explicitly after mode definition
+(define-key task-manager-mode-map (kbd "D") 'task-manager-clear-due-date)
 
-;; ;;; SMERGE
-;; (use-package smerge-mode
-;;   :ensure nil
-;;   :bind (:map smerge-mode-map
-;;               ("C-c ^ u" . smerge-keep-upper)
-;;               ("C-c ^ l" . smerge-keep-lower)
-;;               ("C-c ^ n" . smerge-next)
-;;               ("C-c ^ p" . smerge-previous)))
+;; Add the next task keybinding
+(define-key task-manager-mode-map (kbd "n") 'task-manager-next-task)
 
-;;; DIFF
-(use-package diff-mode
-  :ensure nil
-  :defer t
-  :config
-  (setq diff-default-read-only t)
-  (setq diff-advance-after-apply-hunk t)
-  (setq diff-update-on-the-fly t)
-  (setq diff-font-lock-syntax 'hunk-also)
-  (setq diff-font-lock-prettify nil))
+;; Add key binding for manual backup
+(define-key task-manager-mode-map (kbd "B") 'task-manager-manual-backup)
 
-;;; EDIFF
-(use-package ediff
-  :ensure nil
-  :commands (ediff-buffers ediff-files ediff-buffers3 ediff-files3)
-  :init
-  (setq ediff-split-window-function 'split-window-horizontally)
-  (setq ediff-window-setup-function 'ediff-setup-windows-plain)
-  :config
-  (setq ediff-keep-variants nil)
-  (setq ediff-make-buffers-readonly-at-startup nil)
-  (setq ediff-merge-revisions-with-ancestor t)
-  (setq ediff-show-clashes-only t))
+;; Add new functions for section-specific task addition
+(defun task-manager-add-task-inbox ()
+  "Add a task to the Inbox section."
+  (interactive)
+  (task-manager-add-task "Inbox"))
 
-;;; ELDOC
-(use-package eldoc
-  :ensure nil
-  :init
-  (global-eldoc-mode))
+(defun task-manager-add-task-today ()
+  "Add a task to the Today section."
+  (interactive)
+  (task-manager-add-task "Today"))
 
+(defun task-manager-add-task-week ()
+  "Add a task to the Week section."
+  (interactive)
+  (task-manager-add-task "Week"))
 
+(defun task-manager-add-task-month ()
+  "Add a task to the Month section."
+  (interactive)
+  (task-manager-add-task "Month"))
 
-;;; WHITESPACE
-(use-package whitespace
-  :ensure nil
-  :defer t
-  :hook (before-save . whitespace-cleanup)
-  ;; if we wanna remove this hook at any time, eval:
-  ;; (remove-hook 'before-save-hook #'whitespace-cleanup)
-  )
+(defun task-manager-add-task-calendar ()
+  "Add a task to the Calendar section."
+  (interactive)
+  (task-manager-add-task "Calendar"))
 
+(defun task-manager-add-task-someday ()
+  "Add a task to the Someday section."
+  (interactive)
+  (task-manager-add-task "Someday"))
 
-;;; GNUS
-(use-package gnus
-  :ensure nil
-  :defer t
-  :custom
-  (gnus-init-file (concat user-emacs-directory ".gnus.el"))
-  (gnus-startup-file (concat user-emacs-directory ".newsrc"))
-  (gnus-init-file (concat user-emacs-directory ".newsrc.eld"))
-  (gnus-activate-level 3)
-  (gnus-message-archive-group nil)
-  (gnus-check-new-newsgroups nil)
-  (gnus-check-bogus-newsgroups nil)
-  (gnus-show-threads nil)
-  (gnus-use-cross-reference nil)
-  (gnus-nov-is-evil nil)
-  (gnus-group-line-format "%1M%5y  : %(%-50,50G%)\12")
-  (gnus-logo-colors '("#2fdbde" "#c0c0c0"))
-  (gnus-permanently-visible-groups ".*")
-  (gnus-summary-insert-entire-threads t)
-  (gnus-thread-sort-functions
-   '(gnus-thread-sort-by-most-recent-number
-     gnus-thread-sort-by-subject
-     (not gnus-thread-sort-by-total-score)
-     gnus-thread-sort-by-most-recent-date))
-  (gnus-summary-line-format "%U%R%z: %[%d%] %4{ %-34,34n%} %3{  %}%(%1{%B%}%s%)\12")
-  (gnus-user-date-format-alist '((t . "%d-%m-%Y %H:%M")))
-  (gnus-summary-thread-gathering-function 'gnus-gather-threads-by-references)
-  (gnus-sum--tree-indent " ")
-  (gnus-sum-thread-tree-indent " ")
-  (gnus-sum-thread-tree-false-root "○ ")
-  (gnus-sum-thread-tree-single-indent "◎ ")
-  (gnus-sum-thread-tree-leaf-with-other "├► ")
-  (gnus-sum-thread-tree-root "● ")
-  (gnus-sum-thread-tree-single-leaf "╰► ")
-  (gnus-sum-thread-tree-vertical "│)")
-  (gnus-select-method '(nnnil nil))
-  (gnus-ignored-newsgroups "^to\\.\\|^[0-9. ]+\\( \\|$\\)\\|^[\"]\"[#'()]")
-  (gnus-secondary-select-methods
-   '((nntp "news.gwene.org"))))
+(defun task-manager-add-multiple-tasks-inbox ()
+  "Add multiple tasks to the Inbox section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Inbox"))
 
+(defun task-manager-add-multiple-tasks-today ()
+  "Add multiple tasks to the Today section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Today"))
 
-;;; MAN
-(use-package man
-  :ensure nil
-  :commands (man)
-  :config
-  (setq Man-notify-method 'pushy)) ; does not obey `display-buffer-alist'
+(defun task-manager-add-multiple-tasks-week ()
+  "Add multiple tasks to the Week section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Week"))
 
+(defun task-manager-add-multiple-tasks-month ()
+  "Add multiple tasks to the Month section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Month"))
 
-;;; MINIBUFFER
-(use-package minibuffer
-  :ensure nil
-  :custom
-  (completion-styles '(partial-completion flex initials))
-  (completion-ignore-case t)
-  (completion-show-help t)
-  (completions-max-height 20)
-  (completions-format 'one-column)
-  (enable-recursive-minibuffers t)
-  (read-file-name-completion-ignore-case t)
-  (read-buffer-completion-ignore-case t)
-  :config
-  ;; Keep the cursor out of the read-only portions of the.minibuffer
-  (setq minibuffer-prompt-properties
-        '(read-only t intangible t cursor-intangible t face minibuffer-prompt))
-  (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
+(defun task-manager-add-multiple-tasks-calendar ()
+  "Add multiple tasks to the Calendar section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Calendar"))
 
-  ;; Keep minibuffer lines unwrapped, long lines like on M-y will be truncated
-  (add-hook 'minibuffer-setup-hook
-          (lambda () (setq truncate-lines t)))
+(defun task-manager-add-multiple-tasks-someday ()
+  "Add multiple tasks to the Someday section."
+  (interactive)
+  (task-manager-add-multiple-tasks "Someday"))
 
-  ;; Properly handle C-g in minibuffer
-  (defun my-minibuffer-keyboard-quit ()
-    "Abort the current minibuffer operation and clear its content."
-    (interactive)
-    (abort-recursive-edit)
-    (setq minibuffer-history-variable nil)
-    (setq minibuffer-history-position 0))
-
-  (define-key minibuffer-local-map (kbd "C-g") 'my-minibuffer-keyboard-quit)
-  (define-key minibuffer-local-ns-map (kbd "C-g") 'my-minibuffer-keyboard-quit)
-  (define-key minibuffer-local-completion-map (kbd "C-g") 'my-minibuffer-keyboard-quit)
-  (define-key minibuffer-local-must-match-map (kbd "C-g") 'my-minibuffer-keyboard-quit)
-  (define-key minibuffer-local-isearch-map (kbd "C-g") 'my-minibuffer-keyboard-quit)
-
-  ;; Clear minibuffer history when switching to main buffer
-  (defun my-clear-minibuffer-history ()
-    "Clear minibuffer history when switching to main buffer."
-    (when (minibufferp)
-      (setq minibuffer-history-variable nil)
-      (setq minibuffer-history-position 0)))
-
-  (add-hook 'minibuffer-exit-hook 'my-clear-minibuffer-history)
-
-  (minibuffer-depth-indicate-mode 1)
-  (minibuffer-electric-default-mode 1))
-
-
-;;; NEWSTICKER
-(use-package newsticker
-  :ensure nil
-  :defer t
-  :custom
-  (newsticker-treeview-treewindow-width 40)
-  :hook
-  (newsticker-treeview-item-mode . (lambda ()
-                                     (define-key newsticker-treeview-item-mode-map
-                                                 (kbd "V")
-                                                 'emacs-solo/newsticker-play-yt-video-from-buffer)))
-  :init
-  (defun emacs-solo/newsticker-play-yt-video-from-buffer ()
-    "Plays with mpv async, the current buffer found '* videoId: '."
-    (interactive)
-    (save-excursion
+(defun task-manager-move-to-someday ()
+  "Move selected tasks to Someday section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Someday" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
       (goto-char (point-min))
-      (when (re-search-forward "^\\* videoId: \\(\\w+\\)" nil t)
-        (let ((video-id (match-string 1)))
-          (start-process "mpv-video" nil "mpv" (format "https://www.youtube.com/watch?v=%s" video-id))
-          (message "Playing with mpv: %s" video-id))))))
-
-
-;;; ELEC_PAIR
-(use-package elec-pair
-  :ensure nil
-  :defer
-  :hook (after-init . electric-pair-mode))
-
-;;; PAREN
-(use-package paren
-  :ensure nil
-  :hook (after-init . show-paren-mode)
-  :custom
-  (show-paren-delay 0)
-  (show-paren-style 'mixed)
-  (show-paren-context-when-offscreen t)) ;; show matches within window splits
-
-;;; PROCED
-(use-package proced
-  :ensure nil
-  :defer t
-  :custom
-  (proced-enable-color-flag t)
-  (proced-tree-flag t)
-  (proced-auto-update-flag 'visible)
-  (proced-auto-update-interval 1)
-  (proced-descent t)
-  (proced-filter 'user) ;; We can change interactively with `s'
-  :config
-  (add-hook 'proced-mode-hook
-            (lambda ()
-              (proced-toggle-auto-update 1))))
-
-;;; ORG
-(use-package org
-  :ensure nil
-  :defer t
-  :mode ("\\.org\\'" . org-mode)
-  :config
-  (setq
-   ;; Start collapsed for speed
-   org-startup-folded t
-
-   ;; Edit settings
-   org-auto-align-tags nil
-   org-tags-column 0
-   org-catch-invisible-edits 'show-and-error
-   org-special-ctrl-a/e t
-   org-insert-heading-respect-content t
-
-   ;; Org styling, hide markup etc.
-   org-hide-emphasis-markers t
-   org-pretty-entities t
-
-   ;; Agenda styling
-   org-agenda-tags-column 0
-   org-agenda-block-separator ?─
-   org-agenda-time-grid
-   '((daily today require-timed)
-     (800 1000 1200 1400 1600 1800 2000)
-     " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄")
-   org-agenda-current-time-string
-   "◀── now ─────────────────────────────────────────────────")
-
-  ;; Ellipsis styling
-  (setq org-ellipsis " ▼ ")
-  (set-face-attribute 'org-ellipsis nil :inherit 'default :box nil))
-(setq org-use-speed-commands t)
-
-
-;;; TIME
-(use-package time
-  :ensure nil
-  ;; :hook (after-init . display-time-mode) ;; If we'd like to see it on the modeline
-  :custom
-  (world-clock-time-format "%A %d %B %r %Z")
-  (display-time-day-and-date t)
-  (display-time-default-load-average nil)
-  (display-time-mail-string "")
-  (zoneinfo-style-world-list                ; use `M-x worldclock RET' to see it
-   '(("America/Los_Angeles" "Los Angeles")
-     ("America/Vancouver" "Vancouver")
-     ("Canada/Pacific" "Canada/Pacific")
-     ("America/Chicago" "Chicago")
-     ("America/Toronto" "Toronto")
-     ("America/New_York" "New York")
-     ("Canada/Atlantic" "Canada/Atlantic")
-     ("Brazil/East" "Brasília")
-     ("America/Sao_Paulo" "São Paulo")
-     ("UTC" "UTC")
-     ("Europe/Lisbon" "Lisbon")
-     ("Europe/Brussels" "Brussels")
-     ("Europe/Athens" "Athens")
-     ("Asia/Riyadh" "Riyadh")
-     ("Asia/Tehran" "Tehran")
-     ("Asia/Tbilisi" "Tbilisi")
-     ("Asia/Yekaterinburg" "Yekaterinburg")
-     ("Asia/Kolkata" "Kolkata")
-     ("Asia/Singapore" "Singapore")
-     ("Asia/Shanghai" "Shanghai")
-     ("Asia/Seoul" "Seoul")
-     ("Asia/Tokyo" "Tokyo")
-     ("Asia/Vladivostok" "Vladivostok")
-     ("Australia/Brisbane" "Brisbane")
-     ("Australia/Sydney" "Sydney")
-     ("Pacific/Auckland" "Auckland"))))
-
-
-;;; UNIQUIFY
-(use-package uniquify
-  :ensure nil
-  :config
-  (setq uniquify-buffer-name-style 'forward)
-  (setq uniquify-strip-common-suffix t)
-  (setq uniquify-after-kill-buffer-p t))
-
-;;; WHICH-KEY
-(use-package which-key
-  :defer t
-  :ensure nil
-  :hook
-  (after-init . which-key-mode)
-  :config
-  (setq which-key-separator "  ")
-  (setq which-key-prefix-prefix "... ")
-  (setq which-key-max-display-columns 3)
-  (setq which-key-idle-delay 1.5)
-  (setq which-key-idle-secondary-delay 0.25)
-  (setq which-key-add-column-padding 1)
-  (setq which-key-max-description-length 40))
-
-;;; WEBJUMP
-(use-package webjump
-  :defer t
-  :ensure nil
-  :bind ("C-x /" . webjump)
-  :custom
-  (webjump-sites
-   '(("DuckDuckGo" . [simple-query "www.duckduckgo.com" "www.duckduckgo.com/?q=" ""])
-     ("Google" . [simple-query "www.google.com" "www.google.com/search?q=" ""])
-     ("YouTube" . [simple-query "www.youtube.com/feed/subscriptions" "www.youtube.com/rnesults?search_query=" ""])
-     ("ChatGPT" . [simple-query "https://chatgpt.com" "https://chatgpt.com/?q=" ""]))))
-
- ;;; THEMES
-(use-package modus-themes
-  :ensure nil
-  :defer t
-  :custom
-  (modus-themes-italic-constructs t)
-  (modus-themes-bold-constructs t)
-  (modus-themes-mixed-fonts nil)
-  (modus-themes-prompts '(bold intense))
-  (modus-themes-common-palette-overrides
-   `((bg-main "#272822")                     ; Monokai background
-     (bg-active bg-main)
-     (fg-main "#F8F8F2")                     ; Primary foreground
-     (fg-active fg-main)
-     (fg-mode-line-active "#F8F8F2")
-     (bg-mode-line-active "#3E3D32")
-     (fg-mode-line-inactive "#75715E")
-     (bg-mode-line-inactive "#272822")
-     (border-mode-line-active nil)
-     (border-mode-line-inactive nil)
-     (bg-tab-bar      "#3E3D32")
-     (bg-tab-current  bg-main)
-     (bg-tab-other    "#3E3D32")
-     (fg-prompt "#66D9EF")                   ; Cyan prompt
-     (bg-prompt unspecified)
-     (bg-hover-secondary "#75715E")
-     (bg-completion "#49483E")               ; Dark gray
-     (fg-completion "#F8F8F2")
-     (bg-region "#3E3D32")
-     (fg-region "#F8F8F2")
-
-     (fg-line-number-active fg-main)
-     (fg-line-number-inactive "#75715E")
-     (bg-line-number-active unspecified)
-     (bg-line-number-inactive "#272822")
-     (fringe "#272822")
-
-     (fg-heading-0 "#F92672")                ; Pink headings
-     (fg-heading-1 "#F92672")
-     (fg-heading-2 "#A6E22E")                ; Green
-     (fg-heading-3 "#E6DB74")                ; Yellow
-     (fg-heading-4 "#66D9EF")                ; Cyan
-
-     (fg-prose-verbatim "#A6E22E")           ; Green code
-     (bg-prose-block-contents "#3E3D32")
-     (fg-prose-block-delimiter "#75715E")
-     (bg-prose-block-delimiter bg-prose-block-contents)
-
-     (accent-1 "#AE81FF")                    ; Purple accent
-
-     (keyword "#F92672")                     ; Pink keywords
-     (builtin "#66D9EF")                     ; Cyan built-ins
-     (comment "#75715E")                     ; Gray comments
-     (string "#E6DB74")                      ; Yellow strings
-     (fnname "#A6E22E")                      ; Green functions
-     (type "#AE81FF")                        ; Purple types
-     (variable "#F8F8F2")                    ; Default variables
-     (docstring "#75715E")                   ; Gray docs
-     (constant "#AE81FF")))                  ; Purple constants
-  :config
-  (modus-themes-with-colors
-    (custom-set-faces
-     `(tab-bar
-       ((,c
-         :background "#3E3D32"
-         :foreground "#F8F8F2")))
-     `(tab-bar-tab
-       ((,c)))
-     `(cursor ((t (:background "#fb2874"))))
-     `(dired-directory ((t (:foreground "#FD971F"))))
-     `(completions-first-difference ((t (:foreground "#FD971F"))))
-     `(tab-bar-tab-inactive
-       ((,c)))))
-
-  :init
-  (load-theme 'modus-vivendi-tinted t))
-
-;; (modus-themes-with-colors
-;;   (custom-set-faces
-;;    `(cursor ((t (:background "#FF00FF"))))))
-
-
-;;; -------------------- NON TREESITTER AREA
-;;; SASS-MODE
-(use-package scss-mode
-  :mode "\\.sass\\'"
-  :defer t)
-
-;;; -------------------- TREESITTER AREA
-
-;;; JS-TS-MODE
-(use-package js-ts-mode
-  :ensure js ;; I care about js-base-mode but it is locked behind the feature "js"
-  :mode "\\.jsx?\\'"
-  :defer 't
-  :custom
-  (js-indent-level 2)
-  :config
-  (add-to-list 'treesit-language-source-alist '(javascript "https://github.com/tree-sitter/tree-sitter-javascript" "master" "src"))
-  (add-to-list 'treesit-language-source-alist '(jsdoc "https://github.com/tree-sitter/tree-sitter-jsdoc" "master" "src")))
-
-;;; TYPESCRIPT-TS-MODE
-(use-package typescript-ts-mode
-  :mode "\\.ts\\'"
-  :defer 't
-  :custom
-  (typescript-indent-level 2)
-  :config
-  (add-to-list 'treesit-language-source-alist '(typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src"))
-  (unbind-key "M-." typescript-ts-base-mode-map))
-
-;;; TYPESCRIPT-TS-MODE
-(use-package tsx-ts-mode
-  :mode "\\.tsx\\'"
-  :defer 't
-  :custom
-  (typescript-indent-level 2)
-  :config
-  (add-to-list 'treesit-language-source-alist '(tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src"))
-  (unbind-key "M-." typescript-ts-base-mode-map))
-
-
-;;; RUST-TS-MODE
-(use-package rust-ts-mode
-  :ensure rust-ts-mode
-  :mode "\\.rs\\'"
-  :defer 't
-  :custom
-  (rust-indent-level 2)
-  :config
-  (add-to-list 'treesit-language-source-alist '(rust "https://github.com/tree-sitter/tree-sitter-rust" "master" "src")))
-
-;;; TOML-TS-MODE
-(use-package toml-ts-mode
-  :ensure toml-ts-mode
-  :mode "\\.toml\\'"
-  :defer 't
-  :config
-  (add-to-list 'treesit-language-source-alist '(toml "https://github.com/ikatyang/tree-sitter-toml" "master" "src")))
-
-;;; MARKDOWN-TS-MODE - EMACS-31
-;;  As I first proposed here:
-;;  https://lists.gnu.org/archive/html/emacs-devel/2025-02/msg00810.html
-(use-package markdown-ts-mode
-  :ensure nil
-  :mode "\\.md\\'"
-  :defer 't
-  :config
-  (add-to-list 'major-mode-remap-alist '(markdown-mode . markdown-ts-mode))
-  (add-to-list 'treesit-language-source-alist '(markdown "https://github.com/tree-sitter-grammars/tree-sitter-markdown" "split_parser" "tree-sitter-markdown/src"))
-  (add-to-list 'treesit-language-source-alist '(markdown-inline "https://github.com/tree-sitter-grammars/tree-sitter-markdown" "split_parser" "tree-sitter-markdown-inline/src")))
-
-;;; YAML-TS-MODE
-(use-package yaml-ts-mode
-  :ensure yaml-ts-mode
-  :mode "\\.ya?ml\\'"
-  :defer 't
-  :config
-  (add-to-list 'treesit-language-source-alist '(yaml "https://github.com/tree-sitter-grammars/tree-sitter-yaml" "master" "src")))
-
-;;; DOCKERFILE-TS-MODE
-(use-package dockerfile-ts-mode
-  :ensure dockerfile-ts-mode
-  :mode "\\Dockerfile.*\\'"
-  :defer 't
-  :config
-  (add-to-list 'treesit-language-source-alist '(dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile" "main" "src")))
-
-
-;;; ------------------- EMACS-SOLO CUSTOMS
-;;; EMACS-SOLO-HOOKS
-;;
-(use-package emacs-solo-hooks
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-
-  (defun emacs-solo/prefer-tabs ()
-    "Disables indent-tabs-mode, and prefer spaces over tabs."
-    (interactive)
-    (indent-tabs-mode -1))
-
-  (add-hook 'prog-mode-hook #'emacs-solo/prefer-tabs))
-
-
-;;; EMACS-SOLO-MOVEMENTS
-;;
-;;  Functions to better move around text and Emacs
-;;
-(use-package emacs-solo-movements
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (defun emacs-solo/rename-buffer-and-move-to-new-window ()
-    "Promotes a side window buffer to a new regular window."
-    (interactive)
-    (let ((temp-name (make-temp-name "temp-buffer-")))
-      (rename-buffer temp-name t)
-      (delete-window)
-      (split-window-right)
-      (switch-to-buffer temp-name)))
-
-  (global-set-key (kbd "C-x x x") 'emacs-solo/rename-buffer-and-move-to-new-window)
-
-
-  (defun emacs-solo-movements/scroll-down-centralize ()
-    (interactive)
-    (scroll-up-command)
-    (recenter))
-
-  (defun emacs-solo-movements/scroll-up-centralize ()
-    (interactive)
-    (scroll-down-command)
-    (unless (= (window-start) (point-min))
-      (recenter))
-    (when (= (window-start) (point-min))
-      (let ((midpoint (/ (window-height) 2)))
-        (goto-char (window-start))
-        (forward-line midpoint)
-        (recenter midpoint))))
-
-  (global-set-key (kbd "C-v") #'emacs-solo-movements/scroll-down-centralize)
-  (global-set-key (kbd "M-v") #'emacs-solo-movements/scroll-up-centralize)
-
-  ;; C-g Prot special
-
-  ;; (interactive)
-  ;; (condg
-  ;;  ((region-active-p)
-  ;;   (keyboard-quit))
-  ;;  ((derived-mode-p 'completion-list-mode)
-  ;;   (delete-completion-window))
-  ;;  ((> (minibuffer-depth) 0)
-  ;;   (abort-recursive-edit))
-  ;;  (t
-  ;;   (keyboard-quit))))
-
-;; (define-key global-map (kbd "C-g") #'prot/keyboard-quit-dwim)
-
-  (defun emacs-solo-movements/format-current-file ()
-    "Format the current file using biome if biome.json is present; otherwise, use prettier.
-Also first tries the local node_modules/.bin and later the global bin."
-    (interactive)
-    (let* ((file (buffer-file-name))
-           (project-root (locate-dominating-file file "node_modules"))
-           (biome-config (and project-root (file-exists-p (expand-file-name "biome.json" project-root))))
-           (local-biome (and project-root (expand-file-name "node_modules/.bin/biome" project-root)))
-           (global-biome (executable-find "biome"))
-           (local-prettier (and project-root (expand-file-name "node_modules/.bin/prettier" project-root)))
-           (global-prettier (executable-find "prettier"))
-           (formatter nil)
-           (source nil)
-           (command nil)
-           (start-time (float-time))) ;; Capture the start time
-      (cond
-       ;; Use Biome if biome.json exists
-       ((and biome-config local-biome (file-executable-p local-biome))
-        (setq formatter local-biome)
-        (setq source "biome (local)")
-        (setq command (format "%s format --write %s" formatter (shell-quote-argument file))))
-       ((and biome-config global-biome)
-        (setq formatter global-biome)
-        (setq source "biome (global)")
-        (setq command (format "%s format --write %s" formatter (shell-quote-argument file))))
-
-       ;; Fall back to Prettier if no biome.json
-       ((and local-prettier (file-executable-p local-prettier))
-        (setq formatter local-prettier)
-        (setq source "prettier (local)")
-        (setq command (format "%s --write %s" formatter (shell-quote-argument file))))
-       ((and global-prettier)
-        (setq formatter global-prettier)
-        (setq source "prettier (global)")
-        (setq command (format "%s --write %s" formatter (shell-quote-argument file)))))
-      (if command
-          (progn
-            (save-buffer)
-            (shell-command command)
-            (revert-buffer t t t)
-            (let ((elapsed-time (* 1000 (- (float-time) start-time)))) ;; Calculate elapsed time in ms
-              (message "Formatted with %s - %.2f ms" source elapsed-time)))
-        (message "No formatter found (biome or prettier)"))))
-
-  (global-set-key (kbd "C-c p") #'emacs-solo-movements/format-current-file)
-
-
-  (defun emacs-solo/transpose-split ()
-    "Transpose a horizontal split into a vertical split, or vice versa."
-    (interactive)
-    (if (> (length (window-list)) 2)
-        (user-error "More than two windows present")
-      (let* ((this-win (selected-window))
-             (other-win (next-window))
-             (this-buf (window-buffer this-win))
-             (other-buf (window-buffer other-win))
-             (this-edges (window-edges this-win))
-             (other-edges (window-edges other-win))
-             (this-left (car this-edges))
-             (other-left (car other-edges))
-             (split-horizontally (not (= this-left other-left))))
-        (delete-other-windows)
-        (if split-horizontally
-            (split-window-vertically)
-          (split-window-horizontally))
-        (set-window-buffer (selected-window) this-buf)
-        (set-window-buffer (next-window) other-buf)
-        (select-window this-win))))
-
-  (global-set-key (kbd "C-x 4 t") #'emacs-solo/transpose-split))
-
-;; font aporetic
-;;(set-frame-font "Aporetic Sans Mono-22" t t)
-
-
-;; ;;; EMACS-SOLO-MODE-LINE
-;; ;;
-;; ;;  Customizations to the mode-line
-;; ;;
-(use-package emacs-solo-mode-line
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  ;; Shorten big branches names
-  (defun emacs-solo/shorten-vc-mode (vc)
-    "Shorten VC string to at most 20 characters.
- Replacing `Git-' with a branch symbol."
-    (let* ((vc (replace-regexp-in-string "^ Git[:-]" "  " vc))) ;; Options:   ᚠ ⎇
-      (if (> (length vc) 20)
-          (concat (substring vc 0 20) "…")
-        vc)))
-
-  ;; Formats Modeline
-  (setq-default mode-line-format
-                '("%e" "  "
-                  ;; (:propertize " " display (raise +0.1)) ;; Top padding
-                  ;; (:propertize " " display (raise -0.1)) ;; Bottom padding
-                  (:propertize "λ  " face font-lock-keyword-face)
-
-                  (:propertize
-                   ("" mode-line-mule-info mode-line-client mode-line-modified mode-line-remote))
-
-                  mode-line-frame-identification
-                  mode-line-buffer-identification
-                  "   "
-                  mode-line-position
-                  mode-line-format-right-align
-                  "  "
-                  (project-mode-line project-mode-line-format)
-                  "  "
-                  (vc-mode (:eval (emacs-solo/shorten-vc-mode vc-mode)))
-                  "  "
-                  mode-line-modes
-                  mode-line-misc-info
-                  "  ")
-                project-mode-line t
-                mode-line-buffer-identification '(" %b")
-                mode-line-position-column-line-format '(" %l:%c"))
-
-  ;; Provides the Diminish functionality
-  (defvar emacs-solo-hidden-minor-modes
-    '(abbrev-mode
-      eldoc-mode
-      flyspell-mode
-      smooth-scroll-mode
-      outline-minor-mode
-      which-key-mode))
-
-  (defun emacs-solo/purge-minor-modes ()
-    (interactive)
-    (dolist (x emacs-solo-hidden-minor-modes nil)
-      (let ((trg (cdr (assoc x minor-mode-alist))))
-        (when trg
-          (setcar trg "")))))
-
-  (add-hook 'after-change-major-mode-hook 'emacs-solo/purge-minor-modes))
-
-
-;;; EMACS-SOLO-EXEC-PATH-FROM-SHELL
-;;
-;;  Loads users default shell PATH settings into Emacs. Usefull
-;;  when calling Emacs directly from GUI systems.
-;;
-(use-package emacs-solo-exec-path-from-shell
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (defun emacs-solo/set-exec-path-from-shell-PATH ()
-    "Set up Emacs' `exec-path' and PATH environment the same as user Shell."
-    (interactive)
-    (let ((path-from-shell
-           (replace-regexp-in-string
-            "[ \t\n]*$" "" (shell-command-to-string
-                            "$SHELL --login -c 'echo $PATH'"))))
-      (setenv "PATH" path-from-shell)
-      (setq exec-path (split-string path-from-shell path-separator))
-      (message ">>> emacs-solo: PATH loaded")))
-
-  (defun emacs-solo/fix-asdf-path ()
-  "Ensure asdf shims and active Node.js version's bin directory are first in PATH."
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Someday." (length tasks-to-move)))))
+
+(defun task-manager-toggle-commands ()
+  "Toggle the visibility of the commands section."
   (interactive)
-  (let* ((asdf-shims (expand-file-name "~/.asdf/shims"))
-         (node-bin (string-trim (shell-command-to-string "asdf where nodejs 2>/dev/null")))
-         (new-paths (list asdf-shims)))
-
-    ;; If Node.js is installed, add its bin path
-    (when (file-directory-p node-bin)
-      (push (concat node-bin "/bin") new-paths))
-
-    ;; Remove old asdf-related paths from PATH and exec-path
-    (setq exec-path (seq-remove (lambda (p) (string-match-p "/\\.asdf/" p)) exec-path))
-    (setenv "PATH" (string-join (seq-remove (lambda (p) (string-match-p "/\\.asdf/" p))
-                                            (split-string (getenv "PATH") ":"))
-                                ":"))
-
-    ;; Add the new paths to exec-path and PATH
-    (dolist (p (reverse new-paths))
-      (unless (member p exec-path) (push p exec-path))
-      (unless (member p (split-string (getenv "PATH") ":"))
-        (setenv "PATH" (concat p ":" (getenv "PATH")))))))
-
-  (add-hook 'find-file-hook #'emacs-solo/fix-asdf-path)
-  (add-hook 'eshell-mode-hook #'emacs-solo/fix-asdf-path)
-  (add-hook 'eshell-pre-command-hook #'emacs-solo/fix-asdf-path)
-  (add-hook 'eshell-directory-change-hook #'emacs-solo/fix-asdf-path)
-
-  (add-hook 'after-init-hook #'emacs-solo/set-exec-path-from-shell-PATH)
-  (add-hook 'after-init-hook #'emacs-solo/fix-asdf-path))
-
-
-;;; EMACS-SOLO-RAINBOW-DELIMITERS
-;;
-;;  Colorizes matching delimiters
-;;
-;;  FIXME: Make it play nice with treesitter modes
-;;
-(use-package emacs-solo-rainbow-delimiters
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (defun emacs-solo/rainbow-delimiters ()
-    "Apply simple rainbow coloring to parentheses, brackets, and braces in the current buffer.
-Opening and closing delimiters will have matching colors."
-    (interactive)
-    (let ((colors '(font-lock-keyword-face
-                    font-lock-type-face
-                    font-lock-function-name-face
-                    font-lock-variable-name-face
-                    font-lock-constant-face
-                    font-lock-builtin-face
-                    font-lock-string-face
-                    )))
-      (font-lock-add-keywords
-       nil
-       `((,(rx (or "(" ")" "[" "]" "{" "}"))
-          (0 (let* ((char (char-after (match-beginning 0)))
-                    (depth (save-excursion
-                             ;; Move to the correct position based on opening/closing delimiter
-                             (if (member char '(?\) ?\] ?\}))
-                                 (progn
-                                   (backward-char) ;; Move to the opening delimiter
-                                   (car (syntax-ppss)))
-                               (car (syntax-ppss)))))
-                    (face (nth (mod depth ,(length colors)) ',colors)))
-               (list 'face face)))))))
-    (font-lock-flush)
-    (font-lock-ensure))
-
-  (add-hook 'prog-mode-hook #'emacs-solo/rainbow-delimiters))
-
-
-;;; EMACS-SOLO-PROJECT-SELECT
-;;
-;;  Interactively finds a project in a Projects folder and sets it
-;;  to current `project.el' project.
-;;
-(use-package emacs-solo-project-select
-  :ensure nil
-  :no-require t
-  :init
-  (defvar emacs-solo-default-projects-folder "~/Projects"
-    "Default folder to search for projects.")
-
-  (defvar emacs-solo-default-projects-input "**"
-    "Default input to use when finding a project.")
-
-  (defun emacs-solo/find-projects-and-switch (&optional directory)
-    "Find and switch to a project directory from ~/Projects."
-    (interactive)
-    (let* ((d (or directory emacs-solo-default-projects-folder))
-           ;; (find-command (concat "fd --type d --max-depth 4 . " d))           ; with fd
-           (find-command (concat "find " d " -mindepth 1 -maxdepth 4 -type d"))  ; with find
-           (project-list (split-string (shell-command-to-string find-command) "\n" t))
-           (initial-input emacs-solo-default-projects-input))
-      (let ((selected-project
-             (completing-read
-              "Search project folder: "
-              project-list
-              nil nil
-              initial-input)))
-        (when (and selected-project (file-directory-p selected-project))
-          (project-switch-project selected-project)))))
-
-  (defun emacs-solo/minibuffer-move-cursor ()
-    "Move cursor between `*` characters when minibuffer is populated with `**`."
-    (when (string-prefix-p emacs-solo-default-projects-input (minibuffer-contents))
-      (goto-char (+ (minibuffer-prompt-end) 1))))
-
-  (add-hook 'minibuffer-setup-hook #'emacs-solo/minibuffer-move-cursor)
-
-  :bind (:map project-prefix-map
-         ("P" . emacs-solo/find-projects-and-switch)))
-
-
-;;; EMACS-SOLO-VIPER-EXTENSIONS
-;;
-;;  Better VIM (and not VI) bindings for viper-mode
-;;
-(use-package emacs-solo-viper-extensions
-  :ensure nil
-  :no-require t
-  :defer t
-  :after viper
-  :init
-  (defun viper-operate-inside-delimiters (open close op)
-    "Perform OP inside delimiters OPEN and CLOSE (e.g., (), {}, '', or \"\")."
-    (save-excursion
-      (search-backward (char-to-string open) nil t)
-      (forward-char) ;; Move past the opening delimiter
-      (let ((start (point)))
-        (search-forward (char-to-string close) nil t)
-        (backward-char) ;; Move back before the closing delimiter
-        (pulse-momentary-highlight-region start (point))
-        (funcall op start (point)))))
-
-  ;; FIXME: works for most common cases, misses (  bla bla (bla) |cursor-here| )
-  (defun viper-delete-inside-delimiters (open close)
-    "Delete text inside delimiters OPEN and CLOSE, saving it to the kill ring."
-    (interactive "cEnter opening delimiter: \ncEnter closing delimiter: ")
-    (viper-operate-inside-delimiters open close 'kill-region))
-
-  (defun viper-yank-inside-delimiters (open close)
-    "Copy text inside delimiters OPEN and CLOSE to the kill ring."
-    (interactive "cEnter opening delimiter: \ncEnter closing delimiter: ")
-    (viper-operate-inside-delimiters open close 'kill-ring-save))
-
-  (defun viper-delete-line-or-region ()
-    "Delete the current line or the selected region in Viper mode.
-The deleted text is saved to the kill ring."
-    (interactive)
-    (if (use-region-p)
-        ;; If a region is active, delete it
-        (progn
-          (pulse-momentary-highlight-region (region-beginning) (region-end))
-          (run-at-time 0.1 nil 'kill-region (region-beginning) (region-end)))
-      ;; Otherwise, delete the current line including its newline character
-      (pulse-momentary-highlight-region (line-beginning-position) (line-beginning-position 2))
-      (run-at-time 0.1 nil 'kill-region (line-beginning-position) (line-beginning-position 2))))
-
-  (defun viper-yank-line-or-region ()
-    "Yank the current line or the selected region and highlight the region."
-    (interactive)
-    (if (use-region-p)
-        ;; If a region is selected, yank it
-        (progn
-          (kill-ring-save (region-beginning) (region-end))  ;; Yank the region
-          (pulse-momentary-highlight-region (region-beginning) (region-end)))
-      ;; Otherwise, yank the current line
-      (let ((start (line-beginning-position))
-            (end (line-end-position)))
-        (kill-ring-save start end)  ;; Yank the current line
-        (pulse-momentary-highlight-region start end))))
-
-  (defun viper-visual-select ()
-    "Start visual selection from the current position."
-    (interactive)
-    (set-mark (point)))
-
-  (defun viper-visual-select-line ()
-    "Start visual selection from the beginning of the current line."
-    (interactive)
-    (set-mark (line-beginning-position)))
-
-  (defun viper-delete-inner-word ()
-    "Delete the current word under the cursor, handling edge cases."
-    (interactive)
-    (let ((bounds (bounds-of-thing-at-point 'word)))
-      (if bounds
-          (kill-region (car bounds) (cdr bounds))
-        (message "No word under cursor"))))
-
-  (defun viper-change-inner-word ()
-    "Change the current word under the cursor, handling edge cases."
-    (interactive)
-    (viper-delete-inner-word)
-    (viper-insert nil))
-
-  (defun viper-yank-inner-word ()
-    "Yank (copy) the current word under the cursor, handling edge cases."
-    (interactive)
-    (let ((bounds (bounds-of-thing-at-point 'word)))
-      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
-      (if bounds
-          (kill-ring-save (car bounds) (cdr bounds))
-        (message "No word under cursor"))))
-
-  (defun viper-delete-inner-compound-word ()
-    "Delete the entire compound word under the cursor, including `-` and `_`."
-    (interactive)
-    (let ((bounds (viper-compound-word-bounds)))
-      (if bounds
-          (kill-region (car bounds) (cdr bounds))
-        (message "No compound word under cursor"))))
-
-  (defun viper-change-inner-compound-word ()
-    "Change the entire compound word under the cursor, including `-` and `_`."
-    (interactive)
-    (viper-delete-inner-compound-word)
-    (viper-insert nil))
-
-  (defun viper-yank-inner-compound-word ()
-    "Yank the entire compound word under the cursor into the kill ring."
-    (interactive)
-    (let ((bounds (viper-compound-word-bounds)))
-      (pulse-momentary-highlight-region (car bounds) (cdr bounds))
-      (if bounds
-          (kill-ring-save (car bounds) (cdr bounds))
-        (message "No compound word under cursor"))))
-
-  (defun viper-compound-word-bounds ()
-    "Get the bounds of a compound word under the cursor.
-A compound word includes letters, numbers, `-`, and `_`."
-    (save-excursion
-      (let* ((start (progn
-                      (skip-chars-backward "a-zA-Z0-9_-")
-                      (point)))
-             (end (progn
-                    (skip-chars-forward "a-zA-Z0-9_-")
-                    (point))))
-        (when (< start end) (cons start end)))))
-
-  (defun viper-go-to-nth-or-first-line (arg)
-    "Go to the first line of the document, or the ARG-nth."
-    (interactive "P")
-    (if arg
-        (viper-goto-line arg)
-      (viper-goto-line 1))
-    (pulse-momentary-highlight-region
-     (line-beginning-position) (line-beginning-position 2)))
-
-  (defun viper-go-to-last-line ()
-    "Go to the last line of the document."
-    (interactive)
-    (goto-char (point-max)))
-
-  (defun viper-window-split-horizontally ()
-    "Split the window horizontally (mimics Vim's `C-w s`)."
-    (interactive)
-    (split-window-below)
-    (other-window 1))
-
-  (defun viper-window-split-vertically ()
-    "Split the window vertically (mimics Vim's `C-w v`)."
-    (interactive)
-    (split-window-right)
-    (other-window 1))
-
-  (defun viper-window-close ()
-    "Close the current window (mimics Vim's `C-w c`)."
-    (interactive)
-    (delete-window))
-
-  (defun viper-window-maximize ()
-    "Maximize the current window (mimics Vim's `C-w o`)."
-    (interactive)
-    (delete-other-windows))
-
-  ;; Delete inside delimiters
-  (define-key viper-vi-global-user-map (kbd "di(") (lambda () (interactive) (viper-delete-inside-delimiters ?\( ?\))))
-  (define-key viper-vi-global-user-map (kbd "dib") (lambda () (interactive) (viper-delete-inside-delimiters ?\( ?\))))
-  (define-key viper-vi-global-user-map (kbd "di{") (lambda () (interactive) (viper-delete-inside-delimiters ?{ ?})))
-  (define-key viper-vi-global-user-map (kbd "di\"") (lambda () (interactive) (viper-delete-inside-delimiters ?\" ?\")))
-  (define-key viper-vi-global-user-map (kbd "di'") (lambda () (interactive) (viper-delete-inside-delimiters ?' ?')))
-
-  ;; Yank inside delimiters
-  (define-key viper-vi-global-user-map (kbd "yi(") (lambda () (interactive) (viper-yank-inside-delimiters ?\( ?\))))
-  (define-key viper-vi-global-user-map (kbd "yi{") (lambda () (interactive) (viper-yank-inside-delimiters ?{ ?})))
-  (define-key viper-vi-global-user-map (kbd "yi\"") (lambda () (interactive) (viper-yank-inside-delimiters ?\" ?\")))
-  (define-key viper-vi-global-user-map (kbd "yi'") (lambda () (interactive) (viper-yank-inside-delimiters ?' ?')))
-
-  ;; Delete/Yank current word
-  (define-key viper-vi-global-user-map (kbd "diw") 'viper-delete-inner-word)
-  (define-key viper-vi-global-user-map (kbd "yiw") 'viper-yank-inner-word)
-  (define-key viper-vi-global-user-map (kbd "ciw") 'viper-change-inner-word)
-  (define-key viper-vi-global-user-map (kbd "diW") 'viper-delete-inner-compound-word)
-  (define-key viper-vi-global-user-map (kbd "yiW") 'viper-yank-inner-compound-word)
-  (define-key viper-vi-global-user-map (kbd "ciW") 'viper-change-inner-compound-word)
-
-  ;; Beginning/End buffer
-  (define-key viper-vi-global-user-map (kbd "G") 'viper-go-to-last-line)
-  (define-key viper-vi-global-user-map (kbd "g") nil)
-  (define-key viper-vi-global-user-map (kbd "gg") 'viper-go-to-nth-or-first-line)
-
-  ;; Delete/Yank current line or region
-  (define-key viper-vi-global-user-map (kbd "dd") 'viper-delete-line-or-region)
-  (define-key viper-vi-global-user-map (kbd "yy") 'viper-yank-line-or-region)
-
-  ;; Visual mode is actually marking
-  (define-key viper-vi-global-user-map (kbd "v") 'viper-visual-select)
-  (define-key viper-vi-global-user-map (kbd "V") 'viper-visual-select-line)
-
-  ;; Movements by references and LSP
-  (define-key viper-vi-global-user-map (kbd "gd") 'xref-find-references)
-  (define-key viper-vi-global-user-map (kbd "SPC c a") 'eglot-code-actions)
-  (define-key viper-vi-global-user-map (kbd "SPC s g") 'project-find-regexp)
-  (define-key viper-vi-global-user-map (kbd "SPC s f") 'project-find-file)
-  (define-key viper-vi-global-user-map (kbd "SPC m p") 'emacs-solo-movements/format-current-file)
-  (global-set-key (kbd "C-o") 'xref-go-back)
-
-  ;; Map `C-w` followed by specific keys to window commands in Viper
-  (define-key viper-vi-global-user-map (kbd "C-w s") 'viper-window-split-horizontally)
-  (define-key viper-vi-global-user-map (kbd "C-w v") 'viper-window-split-vertically)
-  (define-key viper-vi-global-user-map (kbd "C-w c") 'viper-window-close)
-  (define-key viper-vi-global-user-map (kbd "C-w o") 'viper-window-maximize)
-
-  ;; Add navigation commands to mimic Vim's `C-w hjkl`
-  (define-key viper-vi-global-user-map (kbd "C-w h") 'windmove-left)
-  (define-key viper-vi-global-user-map (kbd "C-w l") 'windmove-right)
-  (define-key viper-vi-global-user-map (kbd "C-w k") 'windmove-up)
-  (define-key viper-vi-global-user-map (kbd "C-w j") 'windmove-down)
-
-  ;; Indent region
-  (define-key viper-vi-global-user-map (kbd "==") 'indent-region)
-
-  ;; Word spelling
-  (define-key viper-vi-global-user-map (kbd "z=") 'ispell-word)
-
-  ;; Keybindings for buffer navigation and switching in Viper mode
-  (define-key viper-vi-global-user-map (kbd "] b") 'next-buffer)
-  (define-key viper-vi-global-user-map (kbd "[ b") 'previous-buffer)
-  (define-key viper-vi-global-user-map (kbd "b l") 'switch-to-buffer)
-  (define-key viper-vi-global-user-map (kbd "SPC SPC") 'switch-to-buffer)
-
-  ;; Tabs (like in tmux tabs, not vscode tabs)
-  (define-key viper-vi-global-user-map (kbd "C-w t") 'tab-bar-new-tab)
-  (define-key viper-vi-global-user-map (kbd "] t") 'tab-next)
-  (define-key viper-vi-global-user-map (kbd "[ t") 'tab-previous)
-
-  ;; Flymake
-  (define-key viper-vi-global-user-map (kbd "SPC x x") 'flymake-show-buffer-diagnostics)
-  (define-key viper-vi-global-user-map (kbd "] d") 'flymake-goto-next-error)
-  (define-key viper-vi-global-user-map (kbd "[ d") 'flymake-goto-prev-error)
-  (define-key viper-vi-global-user-map (kbd "SPC t i") 'toggle-flymake-diagnostics-at-eol)
-
-  ;; Gutter
-  (define-key viper-vi-global-user-map (kbd "] c") 'emacs-solo/goto-next-hunk)
-  (define-key viper-vi-global-user-map (kbd "[ c") 'emacs-solo/goto-previous-hunk))
-
-
-
-;;; EMACS-SOLO-HIGHLIGHT-KEYWORDS-MODE
-;;
-;;  Highlights a list of words like TODO, FIXME...
-;;  Code borrowed from `alternateved'
-;;
-(use-package emacs-solo-highlight-keywords-mode
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (defcustom +highlight-keywords-faces
-    '(("TODO" . error)
-      ("FIXME" . error)
-      ("HACK" . warning)
-      ("NOTE" . warning)
-      ("HERE" . compilation-info)
-      ("EMACS-31" . compilation-info))
-    "Alist of keywords to highlight and their face."
-    :group '+highlight-keywords
-    :type '(alist :key-type (string :tag "Keyword")
-                  :value-type (symbol :tag "Face"))
-    :set (lambda (sym val)
-           (dolist (face (mapcar #'cdr val))
-             (unless (facep face)
-               (error "Invalid face: %s" face)))
-           (set-default sym val)))
-
-  (defvar +highlight-keywords--keywords
-    (when +highlight-keywords-faces
-      (let ((keywords (mapcar #'car +highlight-keywords-faces)))
-        `((,(regexp-opt keywords 'words)
-           (0 (when (nth 8 (syntax-ppss))
-                (cdr (assoc (match-string 0) +highlight-keywords-faces)))
-              prepend)))))
-    "Keywords and corresponding faces for `emacs-solo/highlight-keywords-mode'.")
-
-  (defun emacs-solo/highlight-keywords-mode-on ()
-    (font-lock-add-keywords nil +highlight-keywords--keywords t)
-    (font-lock-flush))
-
-  (defun emacs-solo/highlight-keywords-mode-off ()
-    (font-lock-remove-keywords nil +highlight-keywords--keywords)
-    (font-lock-flush))
-
-  (define-minor-mode emacs-solo/highlight-keywords-mode
-    "Highlight TODO and similar keywords in comments and strings."
-    :lighter " +HL"
-    :group '+highlight-keywords
-    (if emacs-solo/highlight-keywords-mode
-        (emacs-solo/highlight-keywords-mode-on)
-      (emacs-solo/highlight-keywords-mode-off)))
-
-  :hook
-  (prog-mode . (lambda () (run-at-time "1 sec" nil #'emacs-solo/highlight-keywords-mode-on))))
-
-;; yas snippet global
-(require 'yasnippet)
-(yas-global-mode 1)
-
-
-
-;;; EMACS-SOLO-ACE-WINDOW
-;;
-;;  Based on: https://www.reddit.com/r/emacs/comments/1h0zjvq/comment/m0uy3bo/?context=3
-;;
-;;  TODO: implement ace-swap like feature
-(use-package emacs-solo-ace-window
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (defvar emacs-solo-ace-window/quick-window-overlays nil
-    "List of overlays used to temporarily display window labels.")
-
-  (defun emacs-solo-ace-window/quick-window-jump ()
-    "Jump to a window by typing its assigned character label.
-Windows are labeled starting from the top-left window and proceeding top to bottom, then left to right."
-    (interactive)
-    (let* ((window-list (emacs-solo-ace-window/get-windows))
-           (window-keys (seq-take '("1" "2" "3" "4" "5" "6" "7" "8")
-                                  (length window-list)))
-           (window-map (cl-pairlis window-keys window-list)))
-      (emacs-solo-ace-window/add-window-key-overlays window-map)
-      (let ((key (read-key (format "Select window [%s]: " (string-join window-keys ", ")))))
-        (emacs-solo-ace-window/remove-window-key-overlays)
-        (if-let* ((selected-window (cdr (assoc (char-to-string key) window-map))))
-            (select-window selected-window)
-          (message "No window assigned to key: %c" key)))))
-
-  (defun emacs-solo-ace-window/get-windows ()
-    "Return a list of windows in the current frame, ordered from top to bottom, left to right."
-    (sort (window-list nil 'no-mini)
-          (lambda (w1 w2)
-            (let ((edges1 (window-edges w1))
-                  (edges2 (window-edges w2)))
-              (or (< (car edges1) (car edges2)) ; Compare top edges
-                  (and (= (car edges1) (car edges2)) ; If equal, compare left edges
-                       (< (cadr edges1) (cadr edges2))))))))
-
-  (defun emacs-solo-ace-window/add-window-key-overlays (window-map)
-    "Add temporary overlays to windows with their assigned key labels from WINDOW-MAP."
-    (setq emacs-solo-ace-window/quick-window-overlays nil)
-    (dolist (entry window-map)
-      (let* ((key (car entry))
-             (window (cdr entry))
-             (start (window-start window))
-             (overlay (make-overlay start start (window-buffer window))))
-        (overlay-put overlay 'after-string
-                     (propertize (format " [%s] " key)
-                                 'face '(:foreground "#c3e88d"
-                                         :background "#232635"
-                                         :weight bold
-                                         :height default)))
-        (overlay-put overlay 'window window)
-        (push overlay emacs-solo-ace-window/quick-window-overlays))))
-
-  (defun emacs-solo-ace-window/remove-window-key-overlays ()
-    "Remove all temporary overlays used to display key labels in windows."
-    (mapc 'delete-overlay emacs-solo-ace-window/quick-window-overlays)
-    (setq emacs-solo-ace-window/quick-window-overlays nil))
-
-  (global-set-key (kbd "M-O") #'emacs-solo-ace-window/quick-window-jump))
-
-
-;;; EMACS-SOLO-OLIVETTI
-;;
-(use-package emacs-solo-olivetti
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (defvar emacs-solo-center-document-desired-width 90
-    "The desired width of a document centered in the window.")
-
-  (defun emacs-solo/center-document--adjust-margins ()
-    ;; Reset margins first before recalculating
-    (set-window-parameter nil 'min-margins nil)
-    (set-window-margins nil nil)
-
-    ;; Adjust margins if the mode is on
-    (when emacs-solo/center-document-mode
-      (let ((margin-width (max 0
-                               (truncate
-                                (/ (- (window-width)
-                                      emacs-solo-center-document-desired-width)
-                                   2.0)))))
-        (when (> margin-width 0)
-          (set-window-parameter nil 'min-margins '(0 . 0))
-          (set-window-margins nil margin-width margin-width)))))
-
-  (define-minor-mode emacs-solo/center-document-mode
-    "Toggle centered text layout in the current buffer."
-    :lighter " Centered"
-    :group 'editing
-    (if emacs-solo/center-document-mode
-        (add-hook 'window-configuration-change-hook #'emacs-solo/center-document--adjust-margins 'append 'local)
-      (remove-hook 'window-configuration-change-hook #'emacs-solo/center-document--adjust-margins 'local))
-    (emacs-solo/center-document--adjust-margins))
-
-
-;;  (add-hook 'org-mode-hook #'emacs-solo/center-document-mode)
-  (add-hook 'gnus-group-mode-hook #'emacs-solo/center-document-mode)
-  (add-hook 'gnus-summary-mode-hook #'emacs-solo/center-document-mode)
-  (add-hook 'gnus-article-mode-hook #'emacs-solo/center-document-mode)
-
-  ;; (add-hook 'newsticker-treeview-list-mode-hook 'emacs-solo/timed-center-visual-fill-on)
-  ;; (add-hook 'newsticker-treeview-item-mode-hook 'emacs-solo/timed-center-visual-fill-on)
-  )
-
-
-;;; EMACS-SOLO-0x0
-;;
-;; Inspired by: https://codeberg.org/daviwil/dotfiles/src/branch/master/Emacs.org#headline-28
-(use-package emacs-solo-0x0
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (defun emacs-solo/0x0-upload-text ()
-    (interactive)
-    (let* ((contents (if (use-region-p)
-                         (buffer-substring-no-properties (region-beginning) (region-end))
-                       (buffer-string)))
-           (temp-file (make-temp-file "0x0" nil ".txt" contents)))
-      (message "Sending %s to 0x0.st..." temp-file)
-      (let ((url (string-trim-right
-                  (shell-command-to-string
-                   (format "curl -s -F'file=@%s' https://0x0.st" temp-file)))))
-        (message "The URL is %s" url)
-        (kill-new url)
-        (delete-file temp-file))))
-
-  (defun emacs-solo/0x0-upload-file (file-path)
-    (interactive "fSelect a file to upload: ")
-    (message "Sending %s to 0x0.st..." file-path)
-    (let ((url (string-trim-right
-                (shell-command-to-string
-                 (format "curl -s -F'file=@%s' https://0x0.st" (expand-file-name file-path))))))
-      (message "The URL is %s" url)
-      (kill-new url))))
-
-
-;;; EMACS-SOLO-SUDO-EDIT
-;;
-;; Inspired by: https://codeberg.org/daviwil/dotfiles/src/branch/master/Emacs.org#headline-28
-(use-package emacs-solo-sudo-edit
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (defun emacs-solo/sudo-edit (&optional arg)
-    "Edit currently visited file as root.
-With a prefix ARG prompt for a file to visit.
-Will also prompt for a file to visit if current
-buffer is not visiting a file."
-    (interactive "P")
-    (if (or arg (not buffer-file-name))
-        (find-file (concat "/sudo:root@localhost:"
-                           (completing-read "Find file(as root): ")))
-      (find-alternate-file (concat "/sudo:root@localhost:" buffer-file-name)))))
-
-
-;;; EMACS-SOLO-REPLACE-AS-DIFF
-;;
-(use-package emacs-solo/replace-regexp-as-diff
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-
-  ;; NOTE: improvements wrappers over `multi-file-replace-regexp-as-diff', so
-  ;;       we can:
-  ;;       1.) Use it with glob pattern matching in files, including inside
-  ;;           subfolders (`emacs-solo/multi-file-replace-regexp-as-diff-with-glob')
-  ;;       2.) Use it with marked files and or directories in dired
-  ;;           (`emacs-solo/dired-do-replace-regexp-as-diff')
-
-
-  ;; `M-x emacs-solo/multi-file-replace-regexp-as-diff-with-glob RET'
-  ;;
-  ;; A wrapper for `multi-file-replace-regexp-as-diff' that extends its functionality
-  ;; to support glob patterns for file matching. It recursively searches all files
-  ;; in the specified directory (including subdirectories) that match the given glob
-  ;; pattern (e.g., `*.js`), and displays the replacements as diffs in the
-  ;; `*replace-diff*` buffer. This allows for easy review and application of changes
-  ;; across multiple files.
-  (defun emacs-solo/multi-file-replace-regexp-as-diff-with-glob (dir regexp to-string &optional delimited glob-pattern)
-    "Wrapper for `multi-file-replace-regexp-as-diff` that accepts a directory and a glob pattern.
-DIR is the directory to search recursively.
-REGEXP is the regular expression to replace.
-TO-STRING is the replacement string.
-DELIMITED is an optional argument passed to `multi-file-replace-regexp-as-diff`.
-GLOB-PATTERN is the glob pattern to match files (e.g., \"*.el\")."
-    (interactive
-     (let ((dir (file-truename (read-directory-name "Directory: ")))
-           (common (query-replace-read-args
-                    (concat "Replace"
-                            (if current-prefix-arg " word" "")
-                            " regexp as diff in files")
-                    t t))
-           (glob-pattern (read-string "Glob pattern (e.g., *.el): " "*")))
-       (list dir (nth 0 common) (nth 1 common) (nth 2 common) glob-pattern)))
-
-    (let* ((glob-regexp (wildcard-to-regexp glob-pattern))
-           ;; file-expand-wildcards instead of directory-files-recursively, would
-           ;; not allow us to traverse directories
-           (files (directory-files-recursively dir glob-regexp)))
-
-      (if files
-          (multi-file-replace-regexp-as-diff files regexp to-string delimited)
-        (message "No files found for glob-pattern: %s" glob-pattern))))
-
-
-  ;; `M-x dired RET' mark files and/or directories then
-  ;; `M-x emacs-solo/multi-file-replace-regexp-as-diff-with-glob RET'
-  ;;
-  ;; A version of `dired-do-replace-regexp-as-diff' that adds support for selected
-  ;; directories in Dired. When directories are marked, it recursively includes all
-  ;; files within them (and their subdirectories) in the replacement operation.
-  ;; The replacements are displayed as diffs in the `*replace-diff*` buffer, allowing
-  ;; for review and application of changes across multiple files and directories.
-  (defun emacs-solo/expand-directories (items)
-    "Expand ITEMS to include all files within directories (recursively).
-Directories themselves are excluded from the final list."
-    (cl-loop for item in items
-             if (file-directory-p item)
-             append (let ((files (directory-files-recursively item ".*" t)))
-                      (cl-remove-if #'file-directory-p files))
-             else if (file-regular-p item) ; Ensure only regular files are included
-             collect item))
-  (defun emacs-solo/dired-do-replace-regexp-as-diff (from to &optional delimited)
-    "Do `replace-regexp' of FROM with TO as diff, on all marked files and directories.
-If a marked item is a directory, all files within it (recursively) are included.
-Third arg DELIMITED (prefix arg) means replace only word-delimited matches.
-The replacements are displayed in the buffer *replace-diff* that
-you can later apply as a patch after reviewing the changes."
-    (interactive
-     (let ((common
-            (query-replace-read-args
-             "Replace regexp as diff in marked files and directories" t t t)))
-       (list (nth 0 common) (nth 1 common) (nth 2 common))))
-    (dired-post-do-command)
-    (let* ((marked-items (dired-get-marked-files)) ; Include directories in the list
-           (files (emacs-solo/expand-directories marked-items)))
-      (if files
+  (setq task-manager-show-commands (not task-manager-show-commands))
+  (task-manager-refresh)
+  (message "Commands %s" (if task-manager-show-commands "shown" "hidden")))
+
+(defun task-manager-browse-url-button (button)
+  "Action function for URL buttons that works in read-only buffers."
+  (let ((url (button-get button 'url)))
+    (when url
+      (browse-url url))))
+
+(defun task-manager-find-file-button (button)
+  "Action function for file path buttons that works in read-only buffers."
+  (let ((file-path (button-get button 'file-path)))
+    (when file-path
+      (find-file file-path))))
+
+(defun task-manager-linkify-text (text)
+  "Make URLs and file paths in TEXT clickable."
+  (with-temp-buffer
+    (insert text)
+    (goto-char (point-min))
+    
+    ;; Detect and linkify URLs
+    (while (re-search-forward "\\b\\(https?://\\|www\\.\\)[^ \t\n\r,;()\"']+" nil t)
+      (let* ((start (match-beginning 0))
+             (end (match-end 0))
+             (match (match-string 0))
+             (url (if (string-match-p "^www\\." match)
+                      (concat "http://" match)
+                    match)))
+        ;; Use make-button which works better in read-only buffers
+        (delete-region start end)
+        (insert-button match
+                       :type 'task-url-link
+                       'url url)))
+    
+    ;; Detect and linkify file paths
+    (goto-char (point-min))
+    (while (re-search-forward "\\b\\(file://\\|~/\\|/\\)[^ \t\n\r,;()\"']+" nil t)
+      (let* ((start (match-beginning 0))
+             (end (match-end 0))
+             (match (match-string 0))
+             (file-path (if (string-match-p "^file:" match)
+                           (substring match 5)
+                         match)))
+        ;; Use make-button which works better in read-only buffers
+        (delete-region start end)
+        (insert-button match 
+                       :type 'task-file-link
+                       'file-path file-path)))
+    
+    (buffer-string)))
+
+(defun task-manager-refresh ()
+  "Refresh the display of tasks in the task manager."
+  (let ((inhibit-read-only t)
+        (today (format-time-string "%Y-%m-%d"))
+        (current-date (format-time-string "%A, %d %B %Y"))
+        (current-time (format-time-string "%H:%M")))
+    (erase-buffer)
+    (insert "GTD + Emacs\n")
+    (insert "============\n")
+    
+    ;; Calculate days until December 19th, 2045
+    (let* ((target-date (encode-time 0 0 0 19 12 2045))
+           (now (current-time))
+           (birth-date (encode-time 0 0 0 19 12 1961))
+           (seconds-remaining (- (time-to-seconds target-date) (time-to-seconds now)))
+           (days-remaining (floor (/ seconds-remaining 86400)))
+           (weeks-remaining (floor (/ days-remaining 7)))
+           (total-life-seconds (- (time-to-seconds target-date) (time-to-seconds birth-date)))
+           (life-percentage (floor (* 100 (/ seconds-remaining total-life-seconds)))))
+      (insert (format "%s [%s] -> %d%% | %d Weeks | %d Days left in this body\n\n" 
+                     current-date current-time life-percentage weeks-remaining days-remaining)))
+    
+    ;; Display tasks due today at the top
+    (insert (propertize "Due Today" 'face '(:inherit font-lock-keyword-face :weight bold :foreground "#FF6B6B")))
+    (insert " [-]\n")
+    (let ((due-today-tasks nil))
+      ;; Find tasks due today or with daily recurring
+      (dolist (section task-manager-sections)
+        (let ((tasks (gethash section task-manager-tasks)))
+          (dolist (task tasks)
+            (when (or 
+                   ;; Task with today's due date
+                   (and (string-match "\\[Due: \\([^]]+\\)\\]" task)
+                        (string= (match-string 1 task) today))
+                   ;; Daily recurring task
+                   (string-match-p "\\[Recurring: daily\\]" task))
+              (push (cons section task) due-today-tasks)))))
+      
+      (if due-today-tasks
           (progn
-            (multi-file-replace-regexp-as-diff files from to delimited))
-        (message "No files found in marked items.")))))
+            (dolist (task-pair due-today-tasks)
+              (let* ((section (car task-pair))
+                     (task (cdr task-pair))
+                     (selected (member task task-manager-selected-tasks))
+                     (has-notes (gethash task task-manager-task-notes))
+                     (display-task (replace-regexp-in-string "^TODAY " "" task)))
+                ;; Insert checkbox marker
+                (insert (format "  [%s] " (if selected "X" " ")))
+                
+                ;; Add note indicator if task has notes
+                (when has-notes
+                  (insert (propertize "📝 " 'face '(:foreground "blue" :weight bold))))
+                
+                ;; Process and insert the task with active links
+                (let ((link-start 0)
+                      (processed-text ""))
+                  ;; Find URLs and insert as buttons
+                  (while (string-match "\\(https?://[^ \t\n\r,;()\"']+\\)" display-task link-start)
+                    (let ((start (match-beginning 1))
+                          (end (match-end 1))
+                          (url (match-string 1 display-task)))
+                      ;; Add text before link
+                      (insert (substring display-task link-start start))
+                      ;; Add button for link
+                      (insert-button url
+                                    :type 'task-url-link
+                                    'url url)
+                      (setq link-start end)))
+                  
+                  ;; Add any remaining text after last link
+                  (insert (substring display-task link-start)))
+                
+                (insert (format " (in %s)\n" section))))
+            (insert "\n"))
+        (insert "  No tasks due today\n\n")))
+    
+    ;; Display ALL sections with tasks (excluding Notes section)
+    (dolist (section task-manager-sections)
+      ;; Skip the Notes section
+      (unless (string= section "Notes")
+        (let ((tasks (gethash section task-manager-tasks))
+              (expanded (gethash section task-manager-expanded-sections)))
+          ;; Add section header with color based on section
+          (insert (propertize (format "%s (%d)" section (length tasks))
+                             'face (cond
+                                   ((string= section "Inbox") '(:foreground "#4ECDC4" :weight bold))
+                                   ((string= section "Today") '(:foreground "#FF6B6B" :weight bold))
+                                   ((string= section "Week") '(:foreground "#45B7D1" :weight bold))
+                                   ((string= section "Monday") '(:foreground "#96CEB4" :weight bold))
+                                   ((string= section "Calendar") '(:foreground "#FFEEAD" :weight bold))
+                                   ((string= section "Someday") '(:foreground "#D4A5A5" :weight bold))
+                                   ((string= section "Archive") '(:foreground "#9B9B9B" :weight bold))
+                                   (t '(:foreground "#4A4A4A" :weight bold)))))
+          (if expanded
+              (insert " [-]\n")
+            (insert " [+]\n"))
+          
+          ;; Show tasks if section is expanded
+          (when expanded
+            ;; Sort tasks if in Calendar section
+            (when (string= section "Calendar")
+              (setq tasks (task-manager-sort-tasks-by-due-date tasks)))
+            
+            (dolist (task tasks)
+              (let ((selected (member task task-manager-selected-tasks))
+                    (has-notes (gethash task task-manager-task-notes))
+                    (display-task (replace-regexp-in-string "^TODAY " "" task)))
+                ;; Insert checkbox marker
+                (insert (format "  [%s] " (if selected "X" " ")))
+                
+                ;; Add note indicator if task has notes
+                (when has-notes
+                  (insert (propertize "📝 " 'face '(:foreground "blue" :weight bold))))
+                
+                ;; Process and insert the task with active links
+                (let ((link-start 0))
+                  ;; Find URLs and insert as buttons
+                  (while (string-match "\\(https?://[^ \t\n\r,;()\"']+\\)" display-task link-start)
+                    (let ((start (match-beginning 1))
+                          (end (match-end 1))
+                          (url (match-string 1 display-task)))
+                      ;; Add text before link
+                      (insert (substring display-task link-start start))
+                      ;; Add button for link
+                      (insert-button url
+                                    :type 'task-url-link
+                                    'url url)
+                      (setq link-start end)))
+                  
+                  ;; Add any remaining text after last link
+                  (insert (substring display-task link-start)))
+                
+                (insert "\n")))))))
+    
+    ;; Display commands if enabled, otherwise show a hint
+    (if task-manager-show-commands
+        (progn
+          (insert "\nCommands:\n")
+          (insert "Task Entry:\n")
+          (insert "  a i: Add task to Inbox\n")
+          (insert "  a t: Add task to Today\n")
+          (insert "  a w: Add task to Week\n")
+          (insert "  a m: Add task to Monday\n")
+          (insert "  a s: Add task to Someday\n")
+          (insert "  a c: Add task to Calendar\n")
+          (insert "  A i: Add multiple tasks to Inbox\n")
+          (insert "  A t: Add multiple tasks to Today\n")
+          (insert "  A w: Add multiple tasks to Week\n")
+          (insert "  A m: Add multiple tasks to Monday\n")
+          (insert "  A s: Add multiple tasks to Someday\n")
+          (insert "  A c: Add multiple tasks to Calendar\n")
+          (insert "\nTask Management:\n")
+          (insert "  RET: Edit task at cursor\n")
+          (insert "  SPC: Toggle task selection\n")
+          (insert "  k: Delete selected tasks\n")
+          (insert "  K: Delete all tasks in section\n")
+          (insert "  l: Duplicate task at cursor\n")
+          (insert "  b: Bulk edit selected tasks\n")
+          (insert "  u: Undo last operation\n")
+          (insert "\nTask Properties:\n")
+          (insert "  d: Set due date\n")
+          (insert "  D: Clear due date\n")
+          (insert "  r: Set recurring task\n")
+          (insert "  R: Clear recurring status\n")
+          (insert "  T: Add/remove tags\n")
+          (insert "  X: Set reminders\n")
+          (insert "  N: Add/edit notes\n")
+          (insert "  n: View notes\n")
+          (insert "\nNavigation:\n")
+          (insert "  o i: Open Inbox section\n")
+          (insert "  o t: Open Today section\n")
+          (insert "  o w: Open Week section\n")
+          (insert "  o m: Open Monday section\n")
+          (insert "  o s: Open Someday section\n")
+          (insert "  o c: Open Calendar section\n")
+          (insert "  o a: Open Archive section\n")
+          (insert "  n: Next task\n")
+          (insert "  p: Previous task\n")
+          (insert "\nTask Movement:\n")
+          (insert "  i: Move to Inbox\n")
+          (insert "  t: Move to Today\n")
+          (insert "  w: Move to Week\n")
+          (insert "  m: Move to Monday\n")
+          (insert "  s: Move to Someday\n")
+          (insert "  c: Move to Calendar\n")
+          (insert "  W: Move all Inbox/Today to Week\n")
+          (insert "\nOther Functions:\n")
+          (insert "  B: Create manual backup\n")
+          (insert "  C: Toggle commands visibility\n")
+          (insert "  E: Export tasks\n")
+          (insert "  I: Import tasks\n")
+          (insert "  O: Import from org-agenda\n")
+          (insert "  S: Search tasks\n")
+          (insert "  f: Filter tasks\n")
+          (insert "  g: Refresh buffer\n")
+          (insert "  q: Quit buffer\n")
+          (insert "  z: Collapse all sections\n")
+          (insert "  e: List tasks with dates\n")
+          (insert "  M: Move all tasks from a section\n"))
+      ;; Show reminder when commands are hidden
+      (insert "\nC to show commands\n"))
+    
+    (goto-char (point-min))))
 
-;;; EMACS-SOLO-WEATHER
-;;
-(use-package emacs-solo-weather
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (setq emacs-solo-weather-city "Indaiatuba")
+;; Task Functions
+(defun task-manager-add-task (section)
+  "Add a task to SECTION. If called with a section key (i, t, w, o, c, s), add directly to that section."
+  (interactive
+   (list (let ((key (read-char "Press section key (i,t,w,o,c,s): ")))
+           (cond
+            ((eq key ?i) "Inbox")
+            ((eq key ?t) "Today")
+            ((eq key ?w) "Week")
+            ((eq key ?o) "Monday")
+            ((eq key ?c) "Calendar")
+            ((eq key ?s) "Someday")
+            (t (message "Invalid section key. Use i,t,w,o,c,s")
+               (keyboard-quit))))))
+  (let ((task (if (string= section "Calendar")
+                  ;; For Calendar section, first get the date
+                  (let ((date (task-manager-select-date-with-calendar)))
+                    (if date
+                        (let ((task-text (read-string "Enter new task: ")))
+                          (if (string-empty-p task-text)
+                              (progn
+                                (message "Task creation cancelled.")
+                                (keyboard-quit))
+                            (format "%s [Due: %s]" task-text date)))
+                      (message "Date selection cancelled.")
+                      (keyboard-quit)))
+                ;; For other sections, just get the task
+                (let ((task-text (read-string "Enter new task: ")))
+                  (if (string-empty-p task-text)
+                      (progn
+                        (message "Task creation cancelled.")
+                        (keyboard-quit))
+                    task-text)))))
+    (when task
+      ;; Check if task has a due date in any format
+      (if (or (string-match "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" task)
+              (string-match "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" task)
+              (string-match "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" task))
+          ;; If task has a due date, add it to Calendar section
+          (progn
+            (push task (gethash "Calendar" task-manager-tasks))
+            (message "Task added to Calendar section due to date."))
+        ;; Otherwise add it to the requested section
+        (progn
+          (push task (gethash section task-manager-tasks))
+          (message "Task added to %s section." section)))
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      ;; Find and move to the new task
+      (goto-char (point-min))
+      (search-forward task nil t)
+      (beginning-of-line))))
 
-  (defun emacs-solo/weather-buffer ()
-    "Open a new Emacs buffer and asynchronously fetch wttr.in weather data."
-    (interactive)
-    (let* ((city (shell-quote-argument emacs-solo-weather-city))
-           (buffer (get-buffer-create "*Weather*"))
-           (url1 (format "curl -s 'wttr.in/%s'" city))
-           (url2 (format "curl -s 'v2d.wttr.in/%s'" city)))
-      (with-current-buffer buffer
-        (read-only-mode -1)
+(defun task-manager-add-multiple-tasks (&optional section)
+  "Add multiple tasks to SECTION. If SECTION is not provided, use the current section."
+  (interactive)
+  (let* ((section (or section (task-manager-get-current-section)))
+         (tasks '())
+         (task (read-string (format "Add task to %s (empty line to finish): " section))))
+    (while (not (string-empty-p task))
+      (push task tasks)
+      (setq task (read-string (format "Add task to %s (empty line to finish): " section))))
+    (when tasks
+      (setf (gethash section task-manager-tasks)
+            (append (gethash section task-manager-tasks) (reverse tasks)))
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      ;; Find and move to the last added task
+      (goto-char (point-min))
+      (search-forward (car (reverse tasks)) nil t)
+      (beginning-of-line)
+      (message "Added %d tasks to %s." (length tasks) section))))
+
+(defun task-manager-delete-tasks ()
+  "Move selected tasks to Archive section if they're not in Archive,
+otherwise permanently delete them. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-process (if task-at-point
+                              (list (cdr task-at-point))
+                            task-manager-selected-tasks))
+         (archive-tasks (gethash "Archive" task-manager-tasks))
+         (tasks-to-archive nil)
+         (tasks-to-delete nil))
+    
+    (when tasks-to-process
+      ;; Save current state to undo history
+      (task-manager-push-to-undo-history)
+      
+      ;; Separate tasks between those to archive and those to delete
+      (dolist (task tasks-to-process)
+        (let ((found nil))
+          ;; Find the tasks in their sections
+          (dolist (section task-manager-sections)
+            (let ((tasks (gethash section task-manager-tasks)))
+              (when (and (member task tasks) (not found))
+                (setq found t)
+                (if (string= section "Archive")
+                    ;; If task is in Archive, mark for deletion
+                    (push task tasks-to-delete)
+                  ;; Otherwise mark for archiving
+                  (push (cons section task) tasks-to-archive)))))))
+      
+      ;; Process tasks to archive
+      (let ((archive-count 0))
+        (dolist (section-task tasks-to-archive)
+          (let ((section (car section-task))
+                (task (cdr section-task)))
+            ;; Remove from current section
+            (setf (gethash section task-manager-tasks)
+                  (remove task (gethash section task-manager-tasks)))
+            ;; Add to Archive
+            (push task archive-tasks)
+            (setq archive-count (1+ archive-count))))
+        
+        ;; Update Archive with newly archived tasks
+        (when (> archive-count 0)
+          (puthash "Archive" archive-tasks task-manager-tasks)
+          (message "%d task(s) moved to Archive section." archive-count)))
+      
+      ;; Process tasks to delete (from Archive)
+      (when tasks-to-delete
+        (if (y-or-n-p (format "Permanently delete %d task(s) from Archive?" 
+                             (length tasks-to-delete)))
+            (progn
+              ;; Remove tasks from Archive
+              (setf (gethash "Archive" task-manager-tasks)
+                    (seq-filter (lambda (task) 
+                                 (not (member task tasks-to-delete)))
+                               (gethash "Archive" task-manager-tasks)))
+              (message "%d task(s) permanently deleted." (length tasks-to-delete)))
+          (message "Deletion cancelled.")))
+      
+      ;; Clear selected tasks
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line))))
+
+(defun task-manager-delete-section-tasks ()
+  "Delete all tasks in a chosen section permanently."
+  (interactive)
+  (let* ((section (completing-read "Delete all tasks from section: " 
+                                  task-manager-sections)))
+    (when (and section
+               (y-or-n-p (format "Permanently delete ALL tasks from %s? " section)))
+      ;; Empty the section
+      (puthash section nil task-manager-tasks)
+      ;; Clear any of these tasks from selection
+      (setq task-manager-selected-tasks 
+            (seq-filter (lambda (task)
+                          (not (member task (gethash section task-manager-tasks))))
+                        task-manager-selected-tasks))
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      (message "All tasks from %s permanently deleted." section))))
+
+(defun task-manager-move-tasks ()
+  "Move selected tasks to another section. If cursor is on a task, use that task.
+If called with a section key (i, t, w, o, c, s), move directly to that section."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks))
+         (target (let ((key (read-char "Press section key (i,t,w,o,c,s): ")))
+                  (cond
+                   ((eq key ?i) "Inbox")
+                   ((eq key ?t) "Today")
+                   ((eq key ?w) "Week")
+                   ((eq key ?o) "Monday")
+                   ((eq key ?c) "Calendar")
+                   ((eq key ?s) "Someday")
+                   (t (message "Invalid section key. Use i,t,w,o,c,s")
+                      (keyboard-quit))))))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash target task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to %s." (length tasks-to-move) target))))
+
+(defun task-manager-toggle-all-sections ()
+  "Toggle expansion of all sections. First press collapses all sections, second press expands them."
+  (interactive)
+  (let ((all-collapsed t))
+    ;; Check if all sections are collapsed
+    (dolist (section task-manager-sections)
+      (when (gethash section task-manager-expanded-sections)
+        (setq all-collapsed nil)))
+    
+    ;; Toggle all sections to the opposite state
+    (dolist (section task-manager-sections)
+      (puthash section (not all-collapsed) task-manager-expanded-sections))
+    
+    (task-manager-refresh)
+    (message "All sections %s" (if all-collapsed "expanded" "collapsed"))))
+
+(defun task-manager-toggle-task-at-point ()
+  "Toggle selection of task at point and move to next task if possible."
+  (interactive)
+  (let ((task-found nil)
+        (current-line (line-number-at-pos))
+        (task-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+    ;; Check if we're on a task line (which may now contain text properties for links)
+    (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*?\\)\\(?: (in \\(.*\\))?\\)?$" task-line)
+      (let ((raw-task (match-string 2 task-line))
+            (is-selected (string= (match-string 1 task-line) "X"))
+            (section-info (match-string 3 task-line))) ; for "Due Today" section
+        
+        ;; Find the original task with metadata
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (dolist (full-task tasks)
+              ;; Remove metadata for plain text comparison
+              (let* ((stripped-task (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" full-task))
+                     (stripped-task (string-trim stripped-task)))
+                (when (or (string-match-p (regexp-quote raw-task) stripped-task)
+                          (string-match-p (regexp-quote stripped-task) raw-task))
+                  (setq task-found full-task)
+                  (if (member full-task task-manager-selected-tasks)
+                      (setq task-manager-selected-tasks 
+                            (remove full-task task-manager-selected-tasks))
+                    (push full-task task-manager-selected-tasks)))))))
+        
+        ;; If it's a "Due Today" task with section info, use that
+        (when (and (not task-found) section-info)
+          (let ((tasks (gethash section-info task-manager-tasks)))
+            (dolist (full-task tasks)
+              (let* ((stripped-task (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" full-task))
+                     (stripped-task (string-trim stripped-task)))
+                (when (or (string-match-p (regexp-quote raw-task) stripped-task)
+                          (string-match-p (regexp-quote stripped-task) raw-task))
+                  (if (member full-task task-manager-selected-tasks)
+                      (setq task-manager-selected-tasks 
+                            (remove full-task task-manager-selected-tasks))
+                    (push full-task task-manager-selected-tasks))
+                  (setq task-found t))))))
+        
+        ;; Refresh and position cursor
+        (when task-found
+          (task-manager-save-tasks)
+          (task-manager-refresh)
+          
+          ;; Try to position at the next task (current line + 1)
+          (goto-char (point-min))
+          (forward-line (1- current-line)) ;; Get back to our line
+          
+          ;; Check if there's a next task line (simple check for "[" on next line)
+          (forward-line 1)
+          (let ((next-line (buffer-substring-no-properties 
+                            (line-beginning-position) 
+                            (min (+ (line-beginning-position) 5) (point-max)))))
+            (unless (string-match-p "\\[" next-line)
+              ;; No next task, go back to current task
+              (forward-line -1)))
+          
+          (beginning-of-line))))
+    
+    (unless task-found
+      (message "No task found at point or unable to toggle selection."))))
+
+;; Persistence Functions
+(defun task-manager-push-to-undo-history ()
+  "Save current task state to undo history."
+  (let ((current-state (make-hash-table :test 'equal)))
+    ;; Deep copy the tasks hash table
+    (maphash (lambda (section tasks)
+               (puthash section (copy-sequence tasks) current-state))
+             task-manager-tasks)
+    (push current-state task-manager-undo-history)
+    ;; Limit history size
+    (when (> (length task-manager-undo-history) task-manager-undo-history-size)
+      (setq task-manager-undo-history (butlast task-manager-undo-history)))))
+
+(defun task-manager-undo ()
+  "Undo the last operation in task manager."
+  (interactive)
+  (if (null task-manager-undo-history)
+      (message "Nothing to undo")
+    (let ((previous-state (pop task-manager-undo-history)))
+      ;; Create a fresh hash table
+      (setq task-manager-tasks (make-hash-table :test 'equal))
+      ;; Copy contents from previous state to current state
+      (maphash (lambda (section tasks)
+                 (puthash section (copy-sequence tasks) task-manager-tasks))
+               previous-state)
+      (task-manager-refresh)
+      (message "Undid last operation"))))
+
+(defun task-manager-ensure-backup-directory ()
+  "Ensure the backup directory exists."
+  (unless (file-exists-p task-manager-backup-directory)
+    (make-directory task-manager-backup-directory t)))
+
+(defun task-manager-cleanup-backups ()
+  "Keep only the maximum number of latest backup files."
+  (when (file-exists-p task-manager-backup-directory)
+    (let* ((backup-files (directory-files task-manager-backup-directory t "tasks-backup-.*\\.org$"))
+           (sorted-backups (sort backup-files (lambda (a b)
+                                                (let ((time-a (file-attribute-modification-time (file-attributes a)))
+                                                      (time-b (file-attribute-modification-time (file-attributes b))))
+                                                  (time-less-p time-b time-a))))))
+      ;; Delete old backups exceeding the maximum
+      (when (> (length sorted-backups) task-manager-max-backups)
+        (dolist (old-backup (nthcdr task-manager-max-backups sorted-backups))
+          (when (file-exists-p old-backup)
+            (delete-file old-backup)
+            (message "Deleted old backup: %s" old-backup)))))))
+
+(defun task-manager-create-backup ()
+  "Create a backup of the tasks.org file."
+  (task-manager-ensure-backup-directory)
+  (when (file-exists-p task-manager-save-file)
+    (let* ((current-time (current-time))
+           (timestamp (format-time-string "%Y%m%d-%H%M%S" current-time))
+           (backup-file (expand-file-name (format "tasks-backup-%s.org" timestamp)
+                                         task-manager-backup-directory)))
+      ;; Instead of copying the file directly, we'll recreate it with consistent section names
+      (with-temp-buffer
+        ;; Add header
+        (insert "#+TITLE: Task Manager Data\n\n")
+        
+        ;; Write sections with consistent names
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when tasks
+              (insert (format "* %s\n" section))
+              (dolist (task (reverse tasks)) ;; reverse to maintain order
+                (insert (format "** %s\n" task))))))
+        
+        ;; Write to backup file
+        (write-region (point-min) (point-max) backup-file))
+      
+      (setq task-manager-last-backup-time (float-time current-time))
+      (message "Created backup of tasks.org at %s" backup-file)
+      
+      ;; Clean up old backups
+      (task-manager-cleanup-backups))))
+
+(defun task-manager-backup-if-needed ()
+  "Create a backup if enough time has passed since the last backup."
+  (let ((current-time (float-time)))
+    (when (> (- current-time task-manager-last-backup-time) task-manager-backup-interval)
+      (task-manager-create-backup))))
+
+(defun task-manager-save-tasks ()
+  "Save tasks to the save file using the same section names."
+  (interactive)
+  ;; Only push to history when saving as a result of a change, not on startup
+  (when (called-interactively-p 'any)
+    (task-manager-push-to-undo-history))
+  
+  ;; Check if backup is needed
+  (task-manager-backup-if-needed)
+  
+  ;; Move any tasks with dates to Calendar section before saving
+  (task-manager-move-tasks-with-dates-to-calendar)
+  
+  ;; Read existing file to preserve structure and format
+  (let ((existing-content ""))
+    
+    ;; Try to read existing content to preserve formatting
+    (when (file-exists-p task-manager-save-file)
+      (setq existing-content (with-temp-buffer
+                               (insert-file-contents task-manager-save-file)
+                               (buffer-string))))
+    
+    ;; Create new content
+    (with-temp-buffer
+      ;; If there's no existing content, add standard header
+      (if (string-empty-p existing-content)
+          (insert "#+TITLE: Task Manager\n\n")
+        ;; Otherwise preserve header until first heading
+        (string-match "^\\* " existing-content)
+        (let ((header (substring existing-content 0 (match-beginning 0))))
+          (insert header)))
+      
+      ;; Write sections and tasks directly with the original names
+      (dolist (section task-manager-sections)
+        (let ((tasks (gethash section task-manager-tasks)))
+          (when tasks
+            (insert (format "* %s\n" section))
+            (dolist (task (reverse tasks)) ;; reverse to maintain order
+              (insert (format "** %s\n" task))))))
+      
+      ;; Write notes section (hidden from main view)
+      (insert "\n* Notes\n")
+      (maphash (lambda (task notes)
+                 (when (and notes (not (string-empty-p notes)))
+                   (insert (format "** %s\n" task))
+                   (insert ":NOTES:\n")
+                   (insert notes)
+                   (unless (string-suffix-p "\n" notes)
+                     (insert "\n"))
+                   (insert ":END:\n")))
+               task-manager-task-notes)
+      
+      ;; Write to file
+      (write-region (point-min) (point-max) task-manager-save-file))
+    
+    (message "Tasks saved to %s" task-manager-save-file)))
+
+(defun task-manager-load-tasks ()
+  "Load tasks from the save file."
+  (interactive)
+  ;; Initialize empty lists for all sections
+  (dolist (section task-manager-sections)
+    (puthash section nil task-manager-tasks))
+  
+  ;; Clear notes
+  (setq task-manager-task-notes (make-hash-table :test 'equal))
+  
+  (when (file-exists-p task-manager-save-file)
+    ;; Read and parse the org file
+    (with-temp-buffer
+      (insert-file-contents task-manager-save-file)
+      (org-mode)
+      (goto-char (point-min))
+      (let ((current-section nil)
+            (current-task nil)
+            (in-notes-section nil)
+            (in-notes-content nil))
+        (while (not (eobp))
+          (cond
+           ;; Section header (level 1 heading)
+           ((looking-at "^\\* \\(.+\\)$")
+            (let ((section-name (match-string 1)))
+              (if (string= section-name "Notes")
+                  (setq in-notes-section t)
+                (setq in-notes-section nil)
+                (setq current-section section-name)
+                ;; Make sure section exists (handle custom sections)
+                (unless (member current-section task-manager-sections)
+                  (add-to-list 'task-manager-sections current-section)
+                  (puthash current-section nil task-manager-tasks)))))
+           
+           ;; Task (level 2 heading)
+           ((and (not in-notes-section)
+                 current-section
+                 (looking-at "^\\*\\* \\(.+\\)$"))
+            (let ((task (match-string 1)))
+              (when (and task (not (string-empty-p (string-trim task))))
+                (push task (gethash current-section task-manager-tasks)))))
+           
+           ;; Note task (level 2 heading in Notes section)
+           ((and in-notes-section
+                 (looking-at "^\\*\\* \\(.+\\)$"))
+            (setq current-task (match-string 1))
+            (setq in-notes-content nil))
+           
+           ;; Start of notes content
+           ((and in-notes-section
+                 current-task
+                 (looking-at "^:NOTES:$"))
+            (setq in-notes-content t)
+            (let ((notes-content ""))
+              (forward-line)
+              (while (and (not (eobp))
+                         (not (looking-at "^:END:$")))
+                (setq notes-content (concat notes-content (buffer-substring-no-properties (line-beginning-position) (line-end-position)) "\n"))
+                (forward-line))
+              (when (not (string-empty-p notes-content))
+                (puthash current-task (string-trim-right notes-content) task-manager-task-notes))
+              (setq in-notes-content nil))))
+          (forward-line)))
+      
+      ;; Move any tasks with dates to Calendar section
+      (task-manager-move-tasks-with-dates-to-calendar)
+      
+      ;; Custom tasks processing after loading
+      (message "Tasks loaded from %s" task-manager-save-file))))
+
+;; New Functions
+
+(defun task-manager-search-tasks ()
+  "Search for tasks across all sections."
+  (interactive)
+  (let ((search-term (read-string "Search for: "))
+        (results-buffer (get-buffer-create "*Task Search Results*")))
+    (with-current-buffer results-buffer
+      (let ((inhibit-read-only t))
         (erase-buffer)
-        (insert "Fetching weather data...\n")
-        (read-only-mode 1))
+        (insert (format "Search results for \"%s\":\n\n" search-term))
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks))
+                (found nil))
+            (dolist (task tasks)
+              (when (string-match-p search-term task)
+                (setq found t)
+                (let ((display-task (replace-regexp-in-string "^TODAY " "" task)))
+                  ;; Insert clickable task result
+                  (insert "  ")
+                  (insert-text-button
+                   (format "%s: %s" section display-task)
+                   'action (lambda (_)
+                            (task-manager-goto-task section task))
+                   'follow-link t
+                   'help-echo "Click to go to this task")
+                  (insert "\n"))))
+            (when found
+              (insert "\n"))))
+        (goto-char (point-min)))
+      (special-mode)
+      ;; Add key to go back to task manager
+      (local-set-key (kbd "q") 'kill-this-buffer))
+    (switch-to-buffer results-buffer)))
+
+(defun task-manager-goto-task (section task)
+  "Jump to TASK in SECTION."
+  (let ((buffer (get-buffer "*Task Manager*")))
+    (when buffer
       (switch-to-buffer buffer)
-<      ;; Fetch both asynchronously
-      (emacs-solo--fetch-weather url1 buffer)
-      (emacs-solo--fetch-weather url2 buffer t)))
+      ;; Make sure the section is expanded
+      (puthash section t task-manager-expanded-sections)
+      (task-manager-refresh)
+      
+      ;; Find and position at the task
+      (goto-char (point-min))
+      (search-forward section nil t)
+      (let ((found nil))
+        (while (and (not found) (not (eobp)))
+          (forward-line)
+          (when (and (not (eolp))
+                     (string-match-p (regexp-quote task) (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+            (setq found t)
+            (beginning-of-line)
+            (recenter)))
+        (when found
+          (message "Found task in %s" section))))))
 
-  (defun emacs-solo--fetch-weather (cmd buffer &optional second)
-    "Run CMD asynchronously and insert results into BUFFER.
-If SECOND is non-nil, separate the results with a newline."
-    (make-process
-     :name "weather-fetch"
-     :buffer (generate-new-buffer " *weather-temp*")
-     :command (list "sh" "-c" cmd)
-     :sentinel
-     (lambda (proc _event)
-       (when (eq (process-status proc) 'exit)
-         (let ((output (with-current-buffer (process-buffer proc)
-                         (buffer-string))))
-           (kill-buffer (process-buffer proc))
-           (setq output (replace-regexp-in-string "^Follow.*\n" ""
-                                                  (replace-regexp-in-string "[\x0f]" "" output)))
-           (with-current-buffer buffer
-             (read-only-mode -1)
-             (when second (insert "\n\n"))
-             (insert output)
-             (ansi-color-apply-on-region (point-min) (point-max))
-             (goto-char (point-min))
-             (read-only-mode 1))))))))
+(defun task-manager-set-recurring ()
+  "Set a task to be recurring. If cursor is on a task, use that task.
+Selecting 'None' will clear recurring status."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to set as recurring: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         ;; Add None as first option to allow clearing recurring status
+         (frequency (completing-read "Frequency: " 
+                                    '("None" "daily" "weekly" "monthly")))
+         ;; Remove any existing recurring tag
+         (task-without-recurring (replace-regexp-in-string "\\[Recurring: [^]]*\\]" "" task))
+         (task-without-recurring (string-trim task-without-recurring))
+         (new-task (if (string= frequency "None")
+                       task-without-recurring
+                     (format "%s [Recurring: %s]" task-without-recurring frequency))))
+    
+    ;; Replace old task with new one that includes recurring info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (if (string= frequency "None")
+        (message "Recurring status cleared.")
+      (message "Task set as recurring %s." frequency))))
 
+(defun task-manager-set-priority ()
+  "Set priority for a task. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to set priority: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         (priority (completing-read "Set priority (high, medium, low): " 
+                                   '("high" "medium" "low")))
+         ;; Remove any existing priority tag
+         (task-without-priority (replace-regexp-in-string "\\[Priority: [^]]*\\]" "" task))
+         (task-without-priority (string-trim task-without-priority))
+         (new-task (format "%s [Priority: %s]" task-without-priority priority)))
+    
+    ;; Replace old task with new one that includes priority info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Priority for task set to %s." priority)))
 
-;;; EMACS-SOLO-OLLAMA
-;;
-(use-package emacs-solo-ollama
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (defun emacs-solo/ollama-run-model ()
-    "Run `ollama list`, let the user choose a model, and open it in `ansi-term`.
-Asks for a prompt when run. If none is passed (RET), starts it interactive.
-If a region is selected, prompt for additional input and pass it as a query."
-    (interactive)
-    (let* ((output (shell-command-to-string "ollama list"))
-           (models (let ((lines (split-string output "\n" t)))
-                     (mapcar (lambda (line) (car (split-string line))) (cdr lines))))
-           (selected (completing-read "Select Ollama model: " models nil t))
-           (region-text (when (use-region-p)
-                          (shell-quote-argument
-                           (replace-regexp-in-string "\n" " "
-                                                     (buffer-substring-no-properties
-                                                      (region-beginning)
-                                                      (region-end))))))
-           (prompt (read-string "Ollama Prompt (leave it blank for interactive): " nil nil nil)))
-      (when (and selected (not (string-empty-p selected)))
-        (ansi-term "/bin/sh")
-        (sit-for 1)
-        (let ((args (list (format "ollama run %s"
-                                  selected))))
-          (when (and prompt (not (string-empty-p prompt)))
-            (setq args (append args (list (format "\"%s\"" prompt)))))
-          (when region-text
-            (setq args (append args (list (format "\"%s\"" region-text)))))
+(defun task-manager-select-date-with-calendar ()
+  "Use org's calendar to select a date."
+  (let* ((org-read-date-prefer-future nil)
+         (org-read-date-analyze-future-p nil)
+         (org-read-date-completion-format 'iso)
+         (org-read-date-force-compatible-dates t)
+         (org-read-date-display-live t)
+         (org-read-date-show-calendar t)
+         (org-read-date-with-time nil)
+         (org-read-date-allow-time nil)
+         (org-read-date-inactive nil)
+         (org-read-date-prompt "Select date: ")
+         ;; Set default date to today
+         (org-read-date-default-time (encode-time 0 0 0 (nth 1 (decode-time)) 
+                                                (nth 2 (decode-time)) 
+                                                (nth 5 (decode-time))))
+         (date (org-read-date)))
+    (if date
+        (let ((parsed-date (parse-time-string date)))
+          (format "%04d-%02d-%02d" 
+                  (nth 5 parsed-date)   ; year
+                  (nth 4 parsed-date)   ; month
+                  (nth 3 parsed-date))) ; day
+      nil)))
 
-          (term-send-raw-string (string-join args " "))
-          (term-send-raw-string "\n"))))))
+(defun task-manager-set-due-date ()
+  "Set the due date for a task using org's calendar.
+If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to set due date: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         (existing-date (and (string-match "\\[Due: \\([^]]+\\)\\]" task)
+                           (match-string 1 task)))
+         (date (task-manager-select-date-with-calendar))
+         ;; Remove any existing due date tag
+         (task-without-date (replace-regexp-in-string "\\[Due: [^]]*\\]" "" task))
+         (task-without-date (string-trim task-without-date))
+         (new-task (if date
+                      (format "%s [Due: %s]" task-without-date date)
+                    task-without-date)))
+    
+    ;; Replace old task with new one that includes due date info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (if date
+        (message "Due date set to %s." date)
+      (message "Due date setting cancelled."))))
 
+(defun task-manager-clear-due-date ()
+  "Clear the due date from a task at point."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to clear due date: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         ;; Remove any existing due date tag
+         (new-task (replace-regexp-in-string "\\[Due: [^]]*\\]" "" task))
+         (new-task (string-trim new-task)))
+    
+    ;; Replace old task with new one
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Due date cleared.")))
 
-;;; EMACS-SOLO-DIRED-GUTTER
-;;
-(use-package emacs-solo-dired-gutter
-  :ensure nil
-  :no-require t
-  :defer t
-  :init
-  (setq emacs-solo-dired-gutter-enabled t)
+(defun task-manager-get-all-tags ()
+  "Extract all unique tags from all tasks."
+  (let ((all-tags '()))
+    (dolist (section task-manager-sections)
+      (dolist (task (gethash section task-manager-tasks))
+        (when (string-match "\\[Tags: \\([^]]+\\)\\]" task)
+          (let* ((tags-string (match-string 1 task))
+                 (tags-list (split-string tags-string "," t "\\s-*")))
+            (dolist (tag tags-list)
+              (unless (member tag all-tags)
+                (push tag all-tags)))))))
+    all-tags))
 
-  (defvar emacs-solo/dired-git-status-overlays nil
-    "List of active overlays in Dired for Git status.")
+(defun task-manager-add-tags ()
+  "Add tags to a task. If cursor is on a task, use that task.
+Shows a list of existing tags for selection and offers an option to delete all tags."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to tag: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         (existing-tags (and (string-match "\\[Tags: \\([^]]+\\)\\]" task)
+                            (match-string 1 task)))
+         (all-tags (task-manager-get-all-tags))
+         (all-tags-with-options (append '("Delete all tags" "Enter new tags") all-tags))
+         (choice (completing-read 
+                  (if existing-tags
+                      (format "Choose option or tag (current tags: %s): " existing-tags)
+                    "Choose option or tag: ")
+                  all-tags-with-options))
+         (tags "")
+         (task-without-tags (replace-regexp-in-string "\\[Tags: [^]]*\\]" "" task))
+         (task-without-tags (string-trim task-without-tags))
+         (new-task ""))
+    
+    (cond
+     ;; Delete all tags
+     ((string= choice "Delete all tags")
+      (setq new-task task-without-tags)
+      (message "All tags removed."))
+     
+     ;; Enter new tags manually
+     ((string= choice "Enter new tags")
+      (setq tags (read-string (if existing-tags
+                                 (format "Enter new tags (current: %s): " existing-tags)
+                               "Enter new tags (comma separated): ")))
+      (if (string-empty-p tags)
+          (setq new-task task-without-tags)
+        (setq new-task (format "%s [Tags: %s]" task-without-tags tags))))
+     
+     ;; Selected an existing tag
+     (t
+      (setq tags (if existing-tags
+                     (if (string-match-p (regexp-quote choice) existing-tags)
+                         ;; Remove tag if it already exists
+                         (let ((tag-list (split-string existing-tags "," t "\\s-*")))
+                           (string-join (remove choice tag-list) ", "))
+                       ;; Add tag if it doesn't exist
+                       (concat existing-tags ", " choice))
+                   choice))
+      (if (string-empty-p tags)
+          (setq new-task task-without-tags)
+        (setq new-task (format "%s [Tags: %s]" task-without-tags tags)))))
+    
+    ;; Replace old task with new one that includes tags info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Tags updated.")))
 
-  (defun emacs-solo/dired--git-status-face (code)
-    "Return a cons cell (STATUS . FACE) for a given Git porcelain CODE."
-    (let* ((git-status-untracked "??")
-           (git-status-modified " M")
-           (git-status-modified-alt "M ")
-           (git-status-deleted "D ")
-           (git-status-added "A ")
-           (git-status-renamed "R ")
-           (git-status-copied "C ")
-           (git-status-ignored "!!")
-           (status (cond
-                    ((string-match-p "\\?\\?" code) git-status-untracked)
-                    ((string-match-p "^ M" code) git-status-modified)
-                    ((string-match-p "^M " code) git-status-modified-alt)
-                    ((string-match-p "^D" code) git-status-deleted)
-                    ((string-match-p "^A" code) git-status-added)
-                    ((string-match-p "^R" code) git-status-renamed)
-                    ((string-match-p "^C" code) git-status-copied)
-                    ((string-match-p "\\!\\!" code) git-status-ignored)
-                    (t "  ")))
-           (face (cond
-                  ((string= status git-status-ignored) 'shadow)
-                  ((string= status git-status-untracked) 'warning)
-                  ((string= status git-status-modified) 'font-lock-function-name-face)
-                  ((string= status git-status-modified-alt) 'font-lock-function-name-face)
-                  ((string= status git-status-deleted) 'error)
-                  ((string= status git-status-added) 'success)
-                  (t 'font-lock-keyword-face))))
-      (cons status face)))
+(defun task-manager-setting-reminders ()
+  "Set reminders for tasks. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (if task-at-point
+                  (cdr task-at-point)
+                (completing-read "Select task to set reminder: " (task-manager-all-tasks))))
+         (section (if task-at-point
+                     (car task-at-point)
+                   (task-manager-find-task-section task)))
+         (existing-reminder (and (string-match "\\[Reminder: \\([^]]+\\)\\]" task)
+                               (match-string 1 task)))
+         (reminder-prompt (if existing-reminder
+                             (format "Enter reminder time (currently: %s): " existing-reminder)
+                           "Enter reminder time (YYYY-MM-DD HH:MM): "))
+         (reminder-time (read-string reminder-prompt))
+         ;; Remove any existing reminder tag
+         (task-without-reminder (replace-regexp-in-string "\\[Reminder: [^]]*\\]" "" task))
+         (task-without-reminder (string-trim task-without-reminder))
+         (new-task (format "%s [Reminder: %s]" task-without-reminder reminder-time)))
+    
+    ;; Replace old task with new one that includes reminder info
+    (when section
+      (setf (gethash section task-manager-tasks)
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    (gethash section task-manager-tasks))))
+    
+    ;; Update selected tasks if needed
+    (when (member task task-manager-selected-tasks)
+      (setq task-manager-selected-tasks
+            (mapcar (lambda (t)
+                      (if (string= t task) new-task t))
+                    task-manager-selected-tasks)))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Reminder for task set at %s." reminder-time)))
 
-  (defun emacs-solo/dired-git-status-overlay ()
-    "Overlay Git status indicators on the first column in Dired."
-    (interactive)
-    (require 'vc-git)
-    (let ((git-root (ignore-errors (vc-git-root default-directory))))
-      (when (and git-root
-                 (not (file-remote-p default-directory))
-                 emacs-solo-dired-gutter-enabled)
-        (setq git-root (expand-file-name git-root))
-        (let* ((git-status (vc-git--run-command-string nil "status" "--porcelain" "--ignored" "--untracked-files=normal"))
-               (status-map (make-hash-table :test 'equal)))
-          (mapc #'delete-overlay emacs-solo/dired-git-status-overlays)
-          (setq emacs-solo/dired-git-status-overlays nil)
+(defun task-manager-filter-tasks ()
+  "Filter tasks by priority, due date, or tags."
+  (interactive)
+  (let* ((filter-type (completing-read "Filter by: " '("priority" "due date" "tags")))
+         (filter-value (cond
+                        ;; Use org calendar for due date selection
+                        ((string= filter-type "due date")
+                         (let ((date (task-manager-select-date-with-calendar)))
+                           (if date
+                               date
+                             (message "Date selection cancelled.")
+                             (keyboard-quit))))
+                        ;; Use regular read-string for other types
+                        (t (read-string (format "Enter %s to filter by: " filter-type)))))
+         (results-buffer (get-buffer-create "*Task Filter Results*")))
+    (with-current-buffer results-buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (format "Tasks filtered by %s = \"%s\":\n\n" filter-type filter-value))
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks))
+                (found nil))
+            (dolist (task tasks)
+              (let ((pattern (format "\\[%s: [^]]*%s[^]]*\\]" 
+                                     (cond
+                                      ((string= filter-type "priority") "Priority")
+                                      ((string= filter-type "due date") "Due")
+                                      ((string= filter-type "tags") "Tags"))
+                                     (regexp-quote filter-value))))
+                (when (string-match-p pattern task)
+                  (setq found t)
+                  (let ((display-task (replace-regexp-in-string "^TODAY " "" task)))
+                    ;; Insert clickable task result
+                    (insert "  ")
+                    (insert-text-button
+                     (format "%s: %s" section display-task)
+                     'action (lambda (_)
+                              (task-manager-goto-task section task))
+                     'follow-link t
+                     'help-echo "Click to go to this task")
+                    (insert "\n")))))
+            (when found
+              (insert "\n"))))
+        (goto-char (point-min)))
+      (special-mode)
+      ;; Add key to go back to task manager
+      (local-set-key (kbd "q") 'kill-this-buffer))
+    (switch-to-buffer results-buffer)))
 
-          (dolist (line (split-string git-status "\n" t))
-            (when (string-match "^\\(..\\) \\(.+\\)$" line)
-              (let* ((code (match-string 1 line))
-                     (file (match-string 2 line))
-                     (fullpath (expand-file-name file git-root))
-                     (status-face (emacs-solo/dired--git-status-face code)))
-                (puthash fullpath status-face status-map))))
+(defun task-manager-bulk-edit ()
+  "Perform bulk edits on selected tasks."
+  (interactive)
+  (when task-manager-selected-tasks
+    (let* ((action (completing-read "Bulk action: " 
+                                    '("add tag" "set priority" "set due date" 
+                                      "set reminder" "mark as recurring")))
+           (value (read-string (format "Enter %s value: " action))))
+      (dolist (task task-manager-selected-tasks)
+        (let ((new-task (format "%s [%s: %s]" task
+                                (cond
+                                 ((string= action "add tag") "Tags")
+                                 ((string= action "set priority") "Priority")
+                                 ((string= action "set due date") "Due")
+                                 ((string= action "set reminder") "Reminder")
+                                 ((string= action "mark as recurring") "Recurring"))
+                                value)))
+          ;; Replace old task with new one that includes the new info
+          (dolist (section task-manager-sections)
+            (let ((tasks (gethash section task-manager-tasks)))
+              (when (member task tasks)
+                (setf (gethash section task-manager-tasks)
+                      (mapcar (lambda (t)
+                                (if (string= t task) new-task t))
+                              tasks)))))))
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      (message "Bulk edited %d tasks." (length task-manager-selected-tasks)))))
 
-          (save-excursion
+(defun task-manager-export ()
+  "Export tasks to a file."
+  (interactive)
+  (let* ((format (completing-read "Export format: " '("org" "json" "csv")))
+         (file (read-file-name (format "Export to %s file: " format))))
+    (with-temp-buffer
+      (cond
+       ((string= format "org")
+        (insert "#+TITLE: Task Manager Export\n\n")
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (insert (format "* %s\n" section))
+            (dolist (task tasks)
+              (insert (format "** %s\n" task))))))
+       
+       ((string= format "json")
+        (let ((json-object '()))
+          (dolist (section task-manager-sections)
+            (let ((tasks (gethash section task-manager-tasks)))
+              (push (cons section tasks) json-object)))
+          (insert (json-encode json-object))))
+       
+       ((string= format "csv")
+        (insert "Section,Task\n")
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (dolist (task tasks)
+              (insert (format "%s,%s\n" 
+                              (replace-regexp-in-string "," "\\," section)
+                              (replace-regexp-in-string "," "\\," task))))))))
+      
+      (write-region (point-min) (point-max) file))
+    (message "Tasks exported to %s" file)))
+
+(defun task-manager-import ()
+  "Import tasks from a file."
+  (interactive)
+  (let* ((format (completing-read "Import format: " '("org" "json" "csv" "plain")))
+         (file (read-file-name (format "Import from %s file: " format))))
+    (when (file-exists-p file)
+      (with-temp-buffer
+        (insert-file-contents file)
+        (cond
+         ;; Import org file content as plain tasks to Inbox
+         ((string= format "org")
+          (goto-char (point-min))
+          (while (not (eobp))
+            (let ((line (buffer-substring-no-properties 
+                         (line-beginning-position) (line-end-position))))
+              ;; Skip empty lines and org properties
+              (when (and (not (string-empty-p line))
+                         (not (string-prefix-p "#+" line))
+                         (not (string-prefix-p ":" line)))
+                ;; Remove org markers like *, **, etc.
+                (setq line (replace-regexp-in-string "^\\*+ " "" line))
+                ;; Add each line as a task to Inbox
+                (push line (gethash "Inbox" task-manager-tasks))))
+            (forward-line 1)))
+         
+         ((string= format "json")
+          (let ((json-object (json-read)))
+            (dolist (section-pair json-object)
+              (let ((section (car section-pair))
+                    (tasks (cdr section-pair)))
+                (dolist (task tasks)
+                  (push task (gethash section task-manager-tasks)))))))
+         
+         ((string= format "csv")
+          (goto-char (point-min))
+          (forward-line 1) ;; Skip header
+          (while (not (eobp))
+            (when (looking-at "\\([^,]+\\),\\(.+\\)")
+              (let ((section (match-string 1))
+                    (task (match-string 2)))
+                (push task (gethash section task-manager-tasks))))
+            (forward-line 1)))
+         
+         ;; Plain text - each line is a task in Inbox
+         ((string= format "plain")
+          (goto-char (point-min))
+          (while (not (eobp))
+            (let ((line (buffer-substring-no-properties 
+                         (line-beginning-position) (line-end-position))))
+              (unless (string-empty-p line)
+                (push line (gethash "Inbox" task-manager-tasks))))
+            (forward-line 1)))))
+      
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      (message "Tasks imported from %s" file))))
+
+(defun task-manager-focus-inbox ()
+  "Focus on the Inbox section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Inbox is expanded
+  (puthash "Inbox" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Inbox")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Inbox section and first task
+  (goto-char (point-min))
+  (search-forward "Inbox" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Inbox section"))
+
+(defun task-manager-focus-today ()
+  "Focus on the Today section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Today is expanded
+  (puthash "Today" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Today")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Today section and first task
+  (goto-char (point-min))
+  (search-forward "Today" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Today section"))
+
+(defun task-manager-focus-someday ()
+  "Focus on the Someday section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Someday is expanded
+  (puthash "Someday" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Someday")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Someday section and first task
+  (goto-char (point-min))
+  (search-forward "Someday" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Someday section"))
+
+(defun task-manager-focus-week ()
+  "Focus on the Week section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Week is expanded
+  (puthash "Week" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Week")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Week section and first task
+  (goto-char (point-min))
+  (search-forward "Week" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Week section"))
+
+(defun task-manager-focus-monday ()
+  "Focus on the Monday section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Monday is expanded
+  (puthash "Monday" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Monday")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Monday section and first task
+  (goto-char (point-min))
+  (search-forward "Monday" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Monday section"))
+
+(defun task-manager-focus-calendar ()
+  "Focus on the Calendar section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Calendar is expanded
+  (puthash "Calendar" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Calendar")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Calendar section and first task
+  (goto-char (point-min))
+  (search-forward "Calendar" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Calendar section"))
+
+(defun task-manager-focus-archive ()
+  "Focus on the Archive section, expanding it if it's collapsed."
+  (interactive)
+  ;; Make sure Archive is expanded
+  (puthash "Archive" t task-manager-expanded-sections)
+  
+  ;; Collapse all other sections for clarity
+  (dolist (section task-manager-sections)
+    (unless (string= section "Archive")
+      (puthash section nil task-manager-expanded-sections)))
+  
+  (task-manager-refresh)
+  
+  ;; Navigate to the Archive section and first task
+  (goto-char (point-min))
+  (search-forward "Archive" nil t)
+  (forward-line 1)  ; Move to the first task line
+  (message "Focused on Archive section"))
+
+(defun task-manager-view-recurring ()
+  "View all recurring tasks across all sections."
+  (interactive)
+  (let ((results-buffer (get-buffer-create "*Recurring Tasks*")))
+    (with-current-buffer results-buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert "All Recurring Tasks:\n\n")
+        (let ((found-any nil))
+          (dolist (section task-manager-sections)
+            (let ((tasks (gethash section task-manager-tasks))
+                  (found nil))
+              (dolist (task tasks)
+                (when (string-match-p "\\[Recurring:" task)
+                  (setq found t)
+                  (setq found-any t)
+                  (let ((display-task (replace-regexp-in-string "^TODAY " "" task))
+                        (frequency (if (string-match "\\[Recurring: \\([^]]+\\)\\]" task)
+                                      (match-string 1 task)
+                                    "unknown")))
+                    ;; Insert clickable task
+                    (insert "  ")
+                    (insert-text-button
+                     (format "%s: %s" section display-task)
+                     'action (lambda (_)
+                              (task-manager-goto-task section task))
+                     'follow-link t
+                     'help-echo "Click to go to this task")
+                    (insert "\n"))))
+              (when found
+                (insert "\n"))))
+          
+          (unless found-any
+            (insert "  No recurring tasks found.\n")))
+        
+        (goto-char (point-min)))
+      (special-mode)
+      ;; Add key to go back to task manager
+      (local-set-key (kbd "q") 'kill-this-buffer))
+    (switch-to-buffer results-buffer)
+    (message "Viewing all recurring tasks.")))
+
+(defun task-manager-edit-task-at-point ()
+  "Edit the task at point."
+  (interactive)
+  (let ((task-found nil)
+        (current-line (line-number-at-pos))
+        (task-line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+    
+    ;; Check if we're on a task line
+    (when (string-match "^\\s-*\\[\\([X ]\\)\\] \\(.*\\)$" task-line)
+      (let ((task-text (match-string 2 task-line))
+            (section nil)
+            (original-task nil))
+        
+        ;; Find the section and original task
+        (dolist (sec task-manager-sections)
+          (let ((tasks (gethash sec task-manager-tasks)))
+            (dolist (full-task tasks)
+              (when (string-match-p (regexp-quote task-text) full-task)
+                (setq section sec)
+                (setq original-task full-task)
+                (setq task-found t)))))
+        
+        ;; Also check for "Due Today" tasks with section info in parenthesis
+        (unless task-found
+          (when (string-match "\\[\\([X ]\\)\\] \\(.*\\) (in \\(.*\\))" task-line)
+            (setq task-text (match-string 2 task-line))
+            (setq section (match-string 3 task-line))
+            
+            (let ((tasks (gethash section task-manager-tasks)))
+              (dolist (full-task tasks)
+                (when (string-match-p (regexp-quote task-text) full-task)
+                  (setq original-task full-task)
+                  (setq task-found t))))))
+        
+        (when task-found
+          ;; Extract metadata from original task for preserving
+          (let ((due-date (and (string-match "\\[Due: \\([^]]+\\)\\]" original-task)
+                              (match-string 1 original-task)))
+                (priority (and (string-match "\\[Priority: \\([^]]+\\)\\]" original-task)
+                              (match-string 1 original-task)))
+                (recurring (and (string-match "\\[Recurring: \\([^]]+\\)\\]" original-task)
+                               (match-string 1 original-task)))
+                (tags (and (string-match "\\[Tags: \\([^]]+\\)\\]" original-task)
+                          (match-string 1 original-task)))
+                (reminder (and (string-match "\\[Reminder: \\([^]]+\\)\\]" original-task)
+                              (match-string 1 original-task))))
+            
+            ;; Get the base task text without any metadata
+            (let* ((base-task (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" original-task))
+                   (base-task (string-trim base-task)))
+              
+              ;; Prompt for new task text
+              (let ((new-base-task (read-string "Edit task: " base-task)))
+                
+                ;; Reconstruct the task with its metadata
+                (let ((new-task new-base-task))
+                  (when due-date
+                    (setq new-task (format "%s [Due: %s]" new-task due-date)))
+                  (when priority
+                    (setq new-task (format "%s [Priority: %s]" new-task priority)))
+                  (when recurring
+                    (setq new-task (format "%s [Recurring: %s]" new-task recurring)))
+                  (when tags
+                    (setq new-task (format "%s [Tags: %s]" new-task tags)))
+                  (when reminder
+                    (setq new-task (format "%s [Reminder: %s]" new-task reminder)))
+                  
+                  ;; Replace the old task with the new one
+                  (setf (gethash section task-manager-tasks)
+                        (mapcar (lambda (t)
+                                  (if (string= t original-task) new-task t))
+                                (gethash section task-manager-tasks)))
+                  
+                  ;; Also update in selected tasks if it was selected
+                  (when (member original-task task-manager-selected-tasks)
+                    (setq task-manager-selected-tasks
+                          (mapcar (lambda (t)
+                                    (if (string= t original-task) new-task t))
+                                  task-manager-selected-tasks)))
+                  
+                  (task-manager-save-tasks)
+                  (task-manager-refresh)
+                  
+                  ;; Try to position at the same task line
+                  (goto-char (point-min))
+                  (forward-line (1- current-line))
+                  (beginning-of-line))))))))))
+
+(defun task-manager-previous-task ()
+  "Move to the previous task in the buffer."
+  (interactive)
+  (let ((current-pos (point))
+        (found nil))
+    ;; Move up one line to start searching from the line above current position
+    (forward-line -1)
+    ;; Search backward for a task line (which will have a checkbox)
+    (while (and (not found) (not (bobp)))
+      (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+        (if (string-match-p "^\\s-*\\[\\([X ]\\)\\]" line)
+            (setq found t)
+          (forward-line -1))))
+    
+    ;; If no task found above, go back to original position
+    (unless found
+      (goto-char current-pos)
+      (message "No previous task found"))
+    
+    ;; If found, position cursor at beginning of line
+    (when found
+      (beginning-of-line))))
+
+(defun task-manager-move-to-week ()
+  "Move selected tasks to Week section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Week" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Week." (length tasks-to-move)))))
+
+;; Function to manually create a backup
+(defun task-manager-manual-backup ()
+  "Manually create a backup of the tasks.org file."
+  (interactive)
+  (task-manager-create-backup)
+  (message "Manual backup created."))
+
+;; Setup a timer for periodic backups
+(defvar task-manager-backup-timer nil
+  "Timer object for automatic backups.")
+
+(defun task-manager-start-backup-timer ()
+  "Start the backup timer."
+  (when task-manager-backup-timer
+    (cancel-timer task-manager-backup-timer))
+  (setq task-manager-backup-timer
+        (run-with-timer 
+         task-manager-backup-interval 
+         task-manager-backup-interval 
+         'task-manager-backup-if-needed)))
+
+;; Start the backup timer when the package is loaded
+(eval-after-load 'task-manager2
+  '(task-manager-start-backup-timer))
+
+(defun task-manager-next-task ()
+  "Move to the next task in the buffer."
+  (interactive)
+  (let ((current-pos (point))
+        (found nil))
+    ;; Move down one line to start searching from the line below current position
+    (forward-line 1)
+    ;; Search forward for a task line (which will have a checkbox)
+    (while (and (not found) (not (eobp)))
+      (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+        (if (string-match-p "^\\s-*\\[\\([X ]\\)\\]" line)
+            (setq found t)
+          (forward-line 1))))
+    
+    ;; If no task found below, go back to original position
+    (unless found
+      (goto-char current-pos)
+      (message "No next task found"))
+    
+    ;; If found, position cursor at beginning of line
+    (when found
+      (beginning-of-line))))
+
+(defun task-manager-move-to-today ()
+  "Move selected tasks to Today section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Today" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Today." (length tasks-to-move)))))
+
+(defun task-manager-move-to-inbox ()
+  "Move selected tasks to Inbox section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Inbox" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Inbox." (length tasks-to-move)))))
+
+(defun task-manager-move-to-monday ()
+  "Move selected tasks to Monday section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Monday" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Monday." (length tasks-to-move)))))
+
+(defun task-manager-move-to-calendar ()
+  "Move selected tasks to Calendar section. If cursor is on a task, use that task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (tasks-to-move (if task-at-point
+                           (list (cdr task-at-point))
+                         task-manager-selected-tasks)))
+    
+    (when tasks-to-move
+      (dolist (task tasks-to-move)
+        (dolist (section task-manager-sections)
+          (let ((tasks (gethash section task-manager-tasks)))
+            (when (member task tasks)
+              (setf (gethash section task-manager-tasks)
+                    (remove task tasks))
+              (push task (gethash "Calendar" task-manager-tasks))))))
+      
+      (setq task-manager-selected-tasks nil)
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Restore cursor position
+      (goto-char (point-min))
+      (forward-line (1- current-line))
+      (beginning-of-line)
+      
+      (message "Moved %d task(s) to Calendar." (length tasks-to-move)))))
+
+(defun task-manager-move-all-to-week ()
+  "Move all tasks from Inbox and Today sections to Week section."
+  (interactive)
+  (let ((inbox-tasks (gethash "Inbox" task-manager-tasks))
+        (today-tasks (gethash "Today" task-manager-tasks))
+        (week-tasks (gethash "Week" task-manager-tasks))
+        (count 0))
+    
+    ;; Add all Inbox tasks to Week
+    (dolist (task inbox-tasks)
+      (push task week-tasks)
+      (setq count (1+ count)))
+    
+    ;; Add all Today tasks to Week
+    (dolist (task today-tasks)
+      (push task week-tasks)
+      (setq count (1+ count)))
+    
+    ;; Update the section hash tables
+    (puthash "Week" week-tasks task-manager-tasks)
+    (puthash "Inbox" nil task-manager-tasks)
+    (puthash "Today" nil task-manager-tasks)
+    
+    ;; Remove any of these tasks from selection if they were selected
+    (setq task-manager-selected-tasks 
+          (seq-filter (lambda (task)
+                        (not (or (member task inbox-tasks)
+                                (member task today-tasks))))
+                      task-manager-selected-tasks))
+    
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    
+    ;; Focus on Week section
+    (puthash "Week" t task-manager-expanded-sections)
+    (goto-char (point-min))
+    (search-forward "Week" nil t)
+    (forward-line 1)
+    
+    (message "Moved %d tasks from Inbox and Today to Week." count)))
+
+(defun task-manager-duplicate-task ()
+  "Duplicate the task at the current cursor position and move cursor to the new task."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (current-line (line-number-at-pos))
+         (section nil)
+         (task nil)
+         (timestamp (format-time-string "%Y%m%d%H%M%S")))
+    
+    (if task-at-point
+        (progn
+          (setq section (car task-at-point))
+          (setq task (cdr task-at-point))
+          
+          ;; Add a unique identifier to the duplicated task
+          (let ((duplicated-task (format "%s [ID: %s]" task timestamp)))
+            ;; Add the task to the same section
+            (push duplicated-task (gethash section task-manager-tasks))
+            
+            ;; Save and refresh
+            (task-manager-save-tasks)
+            (task-manager-refresh)
+            
+            ;; Find the newly added task (it should be the first task in the section)
             (goto-char (point-min))
-            (while (not (eobp))
-              (let* ((file (ignore-errors (expand-file-name (dired-get-filename nil t)))))
-                (when file
-                  (setq file (if (file-directory-p file) (concat file "/") file))
-                  (let* ((status-face (gethash file status-map (cons "  " 'font-lock-keyword-face)))
-                         (status (car status-face))
-                         (face (cdr status-face))
-                         (status-str (propertize (format " %s " status) 'face face))
-                         (ov (make-overlay (line-beginning-position) (1+ (line-beginning-position)))))
-                    (overlay-put ov 'before-string status-str)
-                    (push ov emacs-solo/dired-git-status-overlays))))
-              (forward-line 1)))))))
+            (search-forward section nil t)
+            (forward-line 1)  ; Move to the first task line
+            (beginning-of-line)
+            
+            (message "Task duplicated in %s section." section)))
+      (message "No task at cursor position."))))
 
-  (add-hook 'dired-after-readin-hook #'emacs-solo/dired-git-status-overlay))
+;; Add timer for automatic task migration
+(defvar task-manager-auto-migrate-timer nil
+  "Timer object for automatic task migration from Today to Week.")
 
+(defun task-manager-auto-migrate-today-to-week ()
+  "Automatically move all tasks from Today section to Week section."
+  (let ((today-tasks (gethash "Today" task-manager-tasks))
+        (week-tasks (gethash "Week" task-manager-tasks))
+        (count 0))
+    
+    ;; Add all Today tasks to Week
+    (dolist (task today-tasks)
+      (push task week-tasks)
+      (setq count (1+ count)))
+    
+    ;; Update the section hash tables
+    (puthash "Week" week-tasks task-manager-tasks)
+    (puthash "Today" nil task-manager-tasks)
+    
+    ;; Remove any of these tasks from selection if they were selected
+    (setq task-manager-selected-tasks 
+          (seq-filter (lambda (task)
+                        (not (member task today-tasks)))
+                      task-manager-selected-tasks))
+    
+    (task-manager-save-tasks)
+    
+    ;; Only refresh if the task manager buffer is visible
+    (let ((buffer (get-buffer "*Task Manager*")))
+      (when (and buffer (get-buffer-window buffer))
+        (with-current-buffer buffer
+          (task-manager-refresh))))
+    
+    (message "Auto-migrated %d tasks from Today to Week section." count)))
 
-;; ------------------------------------------
-;; EZ
-;; -----------------------------------------
-;; Packages
-(use-package consult :ensure t :defer t)
-(bind-key "C-s" 'consult-line)
-(bind-key "M-." 'consult-buffer)
-(bind-key* "C-\\" 'consult-ripgrep)
-
-
-;; M-return for frame maximization toggle
-(global-set-key (kbd "<M-return>") 'toggle-frame-fullscreen)
-(bind-key "M-," 'find-file)
-
-(bind-key* "M-q" 'save-buffers-kill-terminal)
-(bind-key* "M-s" 'save-buffer)
-
-;; buffers
-(bind-key "M-[" 'previous-buffer)
-(bind-key "M-]" 'next-buffer)
-(bind-key "M-0" 'kill-current-buffer)
-
-;; moving in files.
-(bind-key "M-n" 'forward-paragraph)
-(bind-key "M-p" 'backward-paragraph)
-
-;; ORG MOVE
-(bind-key "M-k" 'org-metaup)
-(bind-key "M-j" 'org-metadown)
-(bind-key "C-j" 'dired-jump)
-
-;;(bind-key "C-c i" (lambda () (interactive) (find-file "~/gitrepos/ezmacs/init.el")))
-
-
-(defun ez/tab-new ()
-  "new tab and call scratch buffer"
+(defun task-manager-schedule-auto-migrate ()
+  "Schedule automatic migration of tasks from Today to Week section at 3 AM."
   (interactive)
-  (tab-new)
-  (switch-to-buffer (get-buffer-create "*scratch*")))
+  ;; Cancel any existing timer
+  (when task-manager-auto-migrate-timer
+    (cancel-timer task-manager-auto-migrate-timer))
+  
+  ;; Calculate time until next 3 AM
+  (let* ((now (current-time))
+         (now-decoded (decode-time now))
+         (hour (nth 2 now-decoded))
+         (minute (nth 1 now-decoded))
+         (second (nth 0 now-decoded))
+         (target-hour 3)
+         (target-minute 0)
+         (target-second 0)
+         (seconds-until-target
+          (if (< hour target-hour)
+              ;; If current time is before 3 AM, calculate seconds until 3 AM today
+              (+ (* (- target-hour hour) 3600)
+                 (* (- target-minute minute) 60)
+                 (- target-second second))
+            ;; If current time is after 3 AM, calculate seconds until 3 AM tomorrow
+            (+ (* (- (+ 24 target-hour) hour) 3600)
+               (* (- target-minute minute) 60)
+               (- target-second second)))))
+    
+    ;; Schedule the migration
+    (setq task-manager-auto-migrate-timer
+          (run-at-time seconds-until-target nil 'task-manager-auto-migrate-today-to-week))
+    
+    ;; Calculate and show the next migration time
+    (let ((next-migration-time (time-add now (seconds-to-time seconds-until-target))))
+      (message "Next automatic migration scheduled for %s" 
+               (format-time-string "%Y-%m-%d %H:%M:%S" next-migration-time)))))
 
+;; Add key binding for importing from org-agenda
+(define-key task-manager-mode-map (kbd "O") 'task-manager-import-from-org-agenda)
 
-(bind-key* "M-t" 'ez/tab-new)
-(bind-key* "M-=" 'tab-next)
-(bind-key* "M--" 'tab-previous)
-(bind-key* "C-M--" 'tab-close)
-
-
-(bind-key* "C-1" 'delete-other-windows)
-
-(bind-key "C-2" (lambda ()
-          (interactive)
-          (split-window-below)
-          (other-window 1)
-          ))
-
-(bind-key "C-3" (lambda ()
-          (interactive)
-          (split-window-right)
-          (other-window 1)
-          ))
-
-
-
-;; GPTel Configuration
-(use-package gptel
-  :ensure t
-  :config
-  ;; Set API key directly (remove auth-sources)
-  (setq gptel-api-key "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")  ; Replace with your actual API key
-
-  ;; Set default model and available models
-  (setq gptel-model "gpt-4o-mini")  ; Set GPT-4-0-mini as default
-  (setq gptel-available-models
-        '(("gpt-4o-mini" . "https://api.openai.com/v1/chat/completions")
-          ("gpt-4.1-mini" . "https://api.openai.com/v1/chat/completions")
-          ("gpt-4" . "https://api.openai.com/v1/chat/completions")
-          ("gpt-3.5-turbo" . "https://api.openai.com/v1/chat/completions")))
-
-  (setq gptel-default-mode 'org-mode)  ; responses in org-mode
-
-  ;; Keybindings
-  (global-set-key (kbd "C-x s") 'gptel-send)
-  (global-set-key (kbd "C-c M-g") 'gptel))
-
-
-
-;; reload init file
-(defun reload-init-file ()
+;; Function to import tasks from org-agenda in a directory
+(defun task-manager-import-from-org-agenda ()
+  "Import tasks from org-agenda in all .org files in a directory and add them to Inbox.
+Excludes tasks.org and backup files (tasks-backup-*). After importing, removes the tasks from the original files."
   (interactive)
-  (load-file user-init-file))
+  (let ((directory (read-directory-name "Directory with org files: "))
+        (imported-count 0))
+    (dolist (file (directory-files directory t "\\.org$"))
+      (let ((filename (file-name-nondirectory file)))
+        (unless (or (string= filename "tasks.org")
+                   (string-match-p "^tasks-backup-" filename))
+          (with-current-buffer (find-file-noselect file)
+            (org-mode)
+            (goto-char (point-min))
+            (let ((positions-to-delete '()))
+              (while (re-search-forward "^\\*+ \\(TODO\\|DONE\\) \\(.*\\)$" nil t)
+                (unless (string= (match-string 1) "DONE")
+                  (push (cons (match-beginning 0)
+                            (save-excursion
+                              (forward-line 1)
+                              (point)))
+                        positions-to-delete)
+                  (push (format "%s [Source: %s]" 
+                              (match-string 2)
+                              filename)
+                        (gethash "Inbox" task-manager-tasks))
+                  (setq imported-count (1+ imported-count))))
+              (when positions-to-delete
+                (setq positions-to-delete (sort positions-to-delete (lambda (a b) (> (car a) (car b)))))
+                (dolist (pos positions-to-delete)
+                  (delete-region (car pos) (cdr pos)))
+                (save-buffer)))))))
+    (task-manager-save-tasks)
+    (task-manager-refresh)
+    (message "Imported %d tasks from org-agenda to Inbox and removed them from source files." imported-count)))
 
-;; abrir gptel en un frame
-(defun ez/launch-gptel-frame ()
-  "Launch gptel in a new frame and prepare it for questions."
+(defun task-manager-check-overdue-migration ()
+  "Check if tasks should have been migrated since last run and migrate if needed."
+  (let* ((now (current-time))
+         (now-decoded (decode-time now))
+         (current-hour (nth 2 now-decoded))
+         (current-minute (nth 1 now-decoded))
+         (last-run-file (expand-file-name "~/.task-manager-last-run"))
+         (last-run-time
+          (if (file-exists-p last-run-file)
+              (with-temp-buffer
+                (insert-file-contents last-run-file)
+                (string-to-number (buffer-string)))
+            ;; If no last run file, assume last run was 24 hours ago
+            (- (time-to-seconds now) 86400)))
+         (last-run-decoded (decode-time (seconds-to-time last-run-time)))
+         (last-run-hour (nth 2 last-run-decoded))
+         (last-run-date (nth 3 last-run-decoded))
+         (current-date (nth 3 now-decoded)))
+    
+    ;; Check if we missed a migration
+    (when (or
+           ;; If last run was before 3 AM and current time is after 3 AM
+           (and (< last-run-hour 3) (>= current-hour 3))
+           ;; If we missed a whole day
+           (> current-date last-run-date))
+      (message "Performing overdue task migration from Today to Week...")
+      (task-manager-auto-migrate-today-to-week))
+    
+    ;; Save current time as last run time
+    (with-temp-file last-run-file
+      (insert (number-to-string (time-to-seconds now))))))
+
+(defun task-manager-collapse-all-sections ()
+  "Collapse all sections."
   (interactive)
-  (let* ((screen-width (display-pixel-width))
-         (screen-height (display-pixel-height))
-         (frame-width (/ screen-width 3))
-         (frame-height screen-height)
-         (frame-left (- screen-width frame-width))
-         (frame-top 0)
-         (chat-frame (make-frame `((top . ,frame-top)
-                                   (left . ,frame-left)
-                                   (width . (text-pixels . ,frame-width))
-                                   (height . (text-pixels . ,frame-height))
-                                   (minibuffer . t)))))
-    (select-frame chat-frame)
-    (add-hook 'gptel-post-response-hook (lambda () (goto-char (point-max))))
-    (gptel "GPT Chat" gptel-api-key nil)
-    (switch-to-buffer "GPT Chat")
-    (delete-other-windows)))
+  (dolist (section task-manager-sections)
+    (puthash section nil task-manager-expanded-sections))
+  (task-manager-refresh)
+  (message "All sections collapsed"))
 
-(bind-key* "M-9" ' ez/launch-gptel-frame)
-
-;; global keybindings
-(global-set-key (kbd "C-c i")
-                (lambda ()
-                  (interactive)
-                  (find-file "~/.emacs.d/init.el")))
-
-(global-set-key (kbd "C-c n")
-                (lambda ()
-                  (interactive)
-                  (find-file "/Users/juanmanuelferreradiaz/.emacs.d/my-org-files/mis_notas2.org")))
-
-
-(global-set-key (kbd "C-c t") 'task-manager2-init)
-
-(global-set-key (kbd "C-c f") 'download-facebook-video)
-
-;; Optional: make the gptel buffer appear in a side window
-(add-to-list 'display-buffer-alist
-             '("\\*gptel-quick\\*"
-               (display-buffer-in-side-window)
-               (side . right)
-               (window-width . 0.4)))
-
-
-(global-set-key (kbd "C-c w") 'gptel-rewrite)
-(global-set-key (kbd "C-x s") 'gptel-send)
-
-;; hook to load abbrev mode
-(add-hook 'text-mode-hook 'abbrev-mode)
-
-;; less stutter in scrolling
-(customize-set-variable 'scroll-conservatively 101)
-(customize-set-variable 'scroll-margin 0)
-
-
-
-;; khoj 1
-
-(use-package khoj
-  :after org
-  :straight (khoj :type git :host github :repo "khoj-ai/khoj"
-                  :files (:defaults "src/interface/emacs/khoj.el"))
-  :bind ("C-c r" . khoj)
-  :config
-  (setq khoj-api-key "kk-rjc30lRKdXmyG-8VsKrCw6-KQ7riTXv6EKbeod4oTlg"
-        khoj-server-url "https://app.khoj.dev"
-        khoj-org-directories '("/Users/juanmanuelferreradiaz/.emacs.d/my-org-files"
-                               "/Users/juanmanuelferreradiaz/.emacs.d/my-org-files/denote")
-        khoj-org-files '("/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/tasks.org")))
-
-
-;; download youtube video
-(defun download-youtube-video (url)
-  "Download a YouTube video from the given URL using yt-dlp, forcing mp4 format."
-  (interactive "sEnter YouTube URL: ")
-  (if (string-empty-p url)
-      (message "URL cannot be empty.")
-    (let ((default-directory "/Users/juanmanuelferreradiaz/Downloads/videos_youtube/"))  ; Adjust as needed
-      (start-process "yt-dlp" "*yt-dlp-output*" "yt-dlp" "-f" "mp4" url))))
-
-
-;; download Facebook video
-(defun download-facebook-video (url)
-  "Download a Facebook video from the given URL using yt-dlp."
-  (interactive "sEnter Facebook video URL: ")
-  (let ((output-file (concat "~/Downloads/videos_facebook/" (file-name-nondirectory url) ".mp4")))
-    (start-process "yt-dlp" "*yt-dlp-output*" "yt-dlp" "-o" output-file url)
-    (message "Downloading video to %s..." output-file)))
-
-;; Enable global-tab-line-mode
-(global-tab-line-mode 1)
-
-;; Function to close all tabs except the current one
-(defun close-other-tabs ()
-  "Close all tabs/buffers except the current one."
+(defun task-manager-list-tasks-with-dates ()
+  "List all tasks with dates in a new buffer, organized by months and weeks."
   (interactive)
-  (let ((current-buffer (current-buffer)))
-    (dolist (buffer (buffer-list))
-      (unless (or (eq buffer current-buffer)
-                  (string-prefix-p " " (buffer-name buffer))
-                  (string-prefix-p "*" (buffer-name buffer)))
-        (kill-buffer buffer)))
-    (message "Closed all other tabs")))
+  (let ((tasks-with-dates nil)
+        (buffer (get-buffer-create "*Tasks with Dates*"))
+        (today (format-time-string "%a, %d")))  ; Add comma between day and date
+    
+    ;; Collect all tasks with dates
+    (maphash
+     (lambda (section tasks)
+       (dolist (task tasks)
+         (let ((due-date (task-manager-get-due-date task)))
+           (when due-date
+             (push (cons due-date (cons section task)) tasks-with-dates)))))
+     task-manager-tasks)
+    
+    ;; Sort tasks by date
+    (setq tasks-with-dates
+          (sort tasks-with-dates
+                (lambda (a b)
+                  (time-less-p (car a) (car b)))))
+    
+    ;; Display tasks in buffer
+    (with-current-buffer buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        
+        ;; Group tasks by month
+        (let ((current-month nil)
+              (current-week nil)
+              (current-date nil))
+          (dolist (task-info tasks-with-dates)
+            (let* ((due-date (car task-info))
+                   (section (car (cdr task-info)))
+                   (task (cdr (cdr task-info)))
+                   (month-year (format-time-string "%B %Y" due-date))
+                   (week-number (format-time-string "%V" due-date))
+                   (formatted-date (format-time-string "%a, %d" due-date)))  ; Add comma between day and date
+              
+              ;; Print month header if it's a new month
+              (unless (string= month-year current-month)
+                (setq current-month month-year)
+                (insert (format "\n%s\n" (make-string (length month-year) ?=)))
+                (insert (format "%s\n" month-year))
+                (insert (make-string (length month-year) ?=) "\n\n")
+                (setq current-week nil)
+                (setq current-date nil))
+              
+              ;; Print week header if it's a new week
+              (unless (string= week-number current-week)
+                (when current-week
+                  (insert "\n"))  ; Add blank line between weeks
+                (setq current-week week-number)
+                (insert (format "Week %s\n" week-number))
+                (insert (make-string (+ 5 (length week-number)) ?-) "\n")
+                (setq current-date nil))
+              
+              ;; Print date header if it's a new date
+              (unless (string= formatted-date current-date)
+                (when current-date
+                  (insert "\n"))  ; Add blank line between dates
+                (setq current-date formatted-date)
+                (insert "  [")
+                ;; Highlight today's date
+                (if (string= formatted-date today)
+                    (insert-text-button formatted-date
+                                      'face '(:foreground "red" :weight bold)
+                                      'help-echo "Today")
+                  (insert formatted-date))
+                (insert "]\n"))
+              
+              ;; Print the task
+              (insert "    ")  ; Indent tasks under their date
+              (insert-text-button
+               task
+               'action (lambda (_)
+                        (task-manager-goto-task section task))
+               'follow-link t
+               'help-echo "Click to go to this task")
+              (insert "\n"))))
+        
+        (goto-char (point-min))
+        (special-mode)))
+    
+    (switch-to-buffer buffer)))
 
-;; Keybindings for tab management
-(global-set-key (kbd "C-x k") 'kill-current-buffer)        ; Close current tab
-(global-set-key (kbd "C-x C-k") 'kill-buffer)             ; Close tab with prompt
-(global-set-key (kbd "C-x C-b k") 'close-other-tabs)      ; Close all except current
-(global-set-key (kbd "s-w") 'kill-current-buffer)         ; Cmd + w on Mac
+;; Update the keybinding in task-manager-mode
+(define-key task-manager-mode-map (kbd "e") 'task-manager-list-tasks-with-dates)
 
-(bind-key* "M-<right>" 'tab-line-switch-to-next-tab)
-(bind-key* "M-<left>"  'tab-line-switch-to-prev-tab)
+(defun task-manager-get-due-date (task)
+  "Extract the due date from TASK and return it as a time value.
+Returns nil if no due date is found."
+  (when (string-match "\\[Due: \\([^]]+\\)\\]" task)
+    (let ((date-str (match-string 1 task)))
+      (when (string-match "\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)" date-str)
+        (let ((year (string-to-number (match-string 1 date-str)))
+              (month (string-to-number (match-string 2 date-str)))
+              (day (string-to-number (match-string 3 date-str))))
+          (encode-time 0 0 0 day month year))))))
 
+(defun task-manager-move-all-from-section ()
+  "Move all tasks from one section to another section."
+  (interactive)
+  (let* ((source-section (completing-read "Move all tasks from section: " task-manager-sections))
+         (target-section (completing-read (format "Move all tasks from %s to section: " source-section) 
+                                        task-manager-sections))
+         (tasks-to-move (gethash source-section task-manager-tasks))
+         (count (length tasks-to-move)))
+    
+    (when (and source-section target-section
+               (not (string= source-section target-section))
+               (> count 0))
+      ;; Add all tasks to target section
+      (dolist (task tasks-to-move)
+        (push task (gethash target-section task-manager-tasks)))
+      
+      ;; Clear source section
+      (puthash source-section nil task-manager-tasks)
+      
+      ;; Remove any of these tasks from selection if they were selected
+      (setq task-manager-selected-tasks 
+            (seq-filter (lambda (task)
+                          (not (member task tasks-to-move)))
+                        task-manager-selected-tasks))
+      
+      (task-manager-save-tasks)
+      (task-manager-refresh)
+      
+      ;; Focus on target section
+      (puthash target-section t task-manager-expanded-sections)
+      (goto-char (point-min))
+      (search-forward target-section nil t)
+      (forward-line 1)
+      
+      (message "Moved %d tasks from %s to %s." count source-section target-section))))
 
-;; Option 1: C-c i (i for init)
+;; Add key binding for moving all tasks from a section
+(define-key task-manager-mode-map (kbd "M") 'task-manager-move-all-from-section)
 
-;; abrir init.el
-;; (global-set-key (kbd "C-c i")
-;;                 (lambda ()
-;;                   (interactive)
-;;                   (find-file "~/.emacs.d/init.el")))
+;; Function to manage notes for a task
+(defun task-manager-manage-notes ()
+  "Open a buffer to manage notes for the task at cursor position."
+  (interactive)
+  (let* ((task-info (task-manager-get-task-at-point))
+         (task (cdr task-info))
+         (section (car task-info)))
+    (if task
+        (let* ((buffer-name (format "*Notes for: %s*" task))
+               (existing-buffer (get-buffer buffer-name))
+               (notes (gethash task task-manager-task-notes)))
+          (if existing-buffer
+              (switch-to-buffer existing-buffer)
+            (let ((buffer (get-buffer-create buffer-name)))
+              (switch-to-buffer buffer)
+              (org-mode)
+              (insert (format "Task: %s\n" task))
+              (insert (format "Section: %s\n\n" section))
+              (if notes
+                  (progn
+                    (insert notes)
+                    (end-of-buffer)
+                    (newline))
+                (forward-line 3))
+              (setq-local task-manager-current-task task)
+              (setq-local task-manager-current-section section)
+              (local-set-key (kbd "N") 'task-manager-save-notes)
+              (local-set-key (kbd "C-k") 'task-manager-exit-notes))))
+      (message "No task at cursor position"))))
 
-;; Rest of your existing tab-line configuration...
-(setq tab-line-tabs-function 'tab-line-tabs-window-buffers)
-(setq tab-line-close-button-show t)
-(setq tab-line-close-button
-      (propertize " ⨂ " 'face '(:foreground "gray50")))
-(setq tab-line-separator (propertize " | " 'face '(:foreground "gray60")))
+(defun task-manager-save-notes ()
+  "Save notes for the current task and close the buffer."
+  (interactive)
+  (let* ((task task-manager-current-task)
+         (section task-manager-current-section)
+         (notes (string-trim (buffer-substring-no-properties 
+                            (save-excursion
+                              (goto-char (point-min))
+                              (forward-line 3)
+                              (point))
+                            (point-max)))))
+    
+    (if (string-empty-p notes)
+        ;; If notes are empty, remove them and the note icon
+        (progn
+          (remhash task task-manager-task-notes)
+          (message "Notes removed."))
+      ;; Otherwise, save the notes
+      (puthash task notes task-manager-task-notes)
+      (message "Notes saved."))
+    
+    ;; Save to file and refresh display
+    (task-manager-save-tasks)
+    (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+      (kill-buffer)
+      (with-current-buffer "*Task Manager*"
+        (task-manager-refresh)
+        ;; Find and move to the task
+        (goto-char (point-min))
+        (search-forward task-text nil t)
+        (beginning-of-line)))))
 
+(defun task-manager-exit-notes ()
+  "Exit the notes buffer without saving."
+  (interactive)
+  (let ((task task-manager-current-task)
+        (task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task-manager-current-task)))
+    (kill-buffer)
+    (message "Notes not saved.")
+    ;; Return to task manager and find the task
+    (with-current-buffer "*Task Manager*"
+      (goto-char (point-min))
+      (search-forward task-text nil t)
+      (beginning-of-line))))
 
+(defun task-manager-view-notes ()
+  "View notes for the task at point in read-only mode."
+  (interactive)
+  (let* ((task-at-point (task-manager-get-task-at-point))
+         (task (when task-at-point (cdr task-at-point)))
+         (section (when task-at-point (car task-at-point))))
+    
+    (if (not task)
+        (message "No task at cursor position.")
+      (let* ((notes (gethash task task-manager-task-notes))
+             (notes-buffer-name (format "*View Notes: %s*" (substring task 0 (min 30 (length task)))))
+             (notes-buffer (get-buffer-create notes-buffer-name)))
+        
+        (if (not notes)
+            (message "No notes for this task.")
+          ;; Set up the view buffer
+          (with-current-buffer notes-buffer
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (insert "Task Notes (Read Only)\n")
+              (insert "====================\n\n")
+              (insert (format "Task: %s\n" task))
+              (insert (format "Section: %s\n\n" section))
+              (insert "----------------------------------------\n\n")
+              (insert notes)
+              (goto-char (point-min))
+              (view-mode)
+              (local-set-key (kbd "q") 'kill-buffer)))
+          
+          ;; Display the buffer
+          (switch-to-buffer notes-buffer))))))
 
-(setq newsticker-url-list
-      '(("Stack Overflow - Emacs" "https://stackoverflow.com/feeds/tag?tagnames=emacs&sort=newest" nil nil nil)
-        ("Arch Linux News" "https://www.archlinux.org/feeds/news/" nil nil nil)))
+;; Update task display to show note icon more prominently
+(defun task-manager-format-task (task section &optional in-today-section)
+  "Format a task for display, including checkbox and note icon if present."
+  (let* ((selected (member task task-manager-selected-tasks))
+         (has-notes (gethash task task-manager-task-notes))
+         (display-task (replace-regexp-in-string "^TODAY " "" task))
+         (formatted ""))
+    
+    ;; Add checkbox
+    (setq formatted (concat formatted (format "  [%s] " (if selected "X" " "))))
+    
+    ;; Add note indicator if task has notes
+    (when has-notes
+      (setq formatted (concat formatted 
+                             (propertize "📝 " 
+                                        'face '(:foreground "blue" :weight bold)
+                                        'help-echo "Task has notes (press N to view/edit)"))))
+    
+    ;; Add task text
+    (setq formatted (concat formatted display-task))
+    
+    ;; Add section info for tasks in Today section
+    (when in-today-section
+      (setq formatted (concat formatted (format " (in %s)" section))))
+    
+    formatted))
 
-;; Enable desktop save mode
-(desktop-save-mode 1)
+;; Add key binding for editing task notes
+(define-key task-manager-mode-map (kbd "N") 'task-manager-manage-notes)
 
-;; Save tabs and buffers
-(setq desktop-restore-frames t)
-(setq desktop-restore-eager t)
-(setq desktop-save t)
+(defun task-manager-parse-date-from-task (task)
+  "Extract date from TASK string in format [Due: YYYY-MM-DD], YYYY-MM-DD or <YYYY-MM-DD Day>."
+  (let ((date nil))
+    ;; Try to match [Due: YYYY-MM-DD] format
+    (if (string-match "\\[Due: \\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)\\]" task)
+        (setq date (match-string 1 task))
+      ;; Try to match <YYYY-MM-DD Day> format
+      (if (string-match "<\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\) [A-Za-z]\\{3\\}>" task)
+          (setq date (match-string 1 task))
+        ;; Try to match YYYY-MM-DD format
+        (when (string-match "\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)" task)
+          (setq date (match-string 1 task)))))
+    date))
 
-;; Set the directory to save the desktop file
-(setq desktop-dirname "~/.emacs.d/.desktop/")
-(setq desktop-path (list desktop-dirname))
+(defun task-manager-move-tasks-with-dates-to-calendar ()
+  "Move all tasks with due dates to Calendar section."
+  (dolist (section task-manager-sections)
+    (unless (string= section "Calendar")
+      (let ((tasks (gethash section task-manager-tasks))
+            (tasks-to-move nil))
+        (dolist (task tasks)
+          (when (or (string-match "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" task)
+                    (string-match "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" task)
+                    (string-match "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" task))
+            (push task tasks-to-move)))
+        ;; Move tasks to Calendar
+        (dolist (task tasks-to-move)
+          (setf (gethash section task-manager-tasks)
+                (remove task (gethash section task-manager-tasks)))
+          (push task (gethash "Calendar" task-manager-tasks)))))))
 
-;; Create desktop save directory if it doesn't exist
-(unless (file-exists-p desktop-dirname)
-  (make-directory desktop-dirname t))
+(defun task-manager-make-urls-clickable (text)
+  "Convert URLs in text to clickable links, showing only the link text."
+  (let ((url-regexp "https?://[^[:space:]]+"))
+    (replace-regexp-in-string
+     url-regexp
+     (lambda (url)
+       (let ((display-text (replace-regexp-in-string "^https?://" "" url)))
+         (format "<a href=\"%s\">%s</a>" url display-text)))
+     text)))
 
-;; Save without asking
-(setq desktop-save 'if-exists)
+(defun task-manager-generate-html-report ()
+  "Generate an HTML report with tables for Due Today, Today tasks, and Calendar tasks."
+  (interactive)
+  (let* ((today (format-time-string "%Y-%m-%d"))
+         (due-today-tasks nil)
+         (today-tasks nil)
+         (calendar-tasks nil)
+         (report-file (expand-file-name "task-report.html" (file-name-directory task-manager-save-file)))
+         (markdown-file (expand-file-name "task-report.md" (file-name-directory task-manager-save-file))))
+    
+    ;; Collect tasks
+    (dolist (section task-manager-sections)
+      (let ((tasks (gethash section task-manager-tasks)))
+        (dolist (task tasks)
+          (cond
+           ;; Due Today tasks
+           ((or (and (string-match "\\[Due: \\([^]]+\\)\\]" task)
+                     (string= (match-string 1 task) today))
+                (string-match-p "\\[Recurring: daily\\]" task))
+            (push task due-today-tasks))
+           ;; Today section tasks
+           ((string= section "Today")
+            (push task today-tasks))
+           ;; Calendar section tasks
+           ((string= section "Calendar")
+            (push task calendar-tasks))))))
+    
+    ;; Reverse the lists to maintain original order
+    (setq due-today-tasks (reverse due-today-tasks))
+    (setq today-tasks (reverse today-tasks))
+    (setq calendar-tasks (reverse calendar-tasks))
+    
+    ;; Take only first 15 Calendar tasks
+    (setq calendar-tasks (seq-take calendar-tasks 15))
+    
+    ;; Generate HTML
+    (with-temp-buffer
+      (insert "<!DOCTYPE html>\n")
+      (insert "<html lang=\"en\">\n<head>\n")
+      (insert "<meta charset=\"UTF-8\">\n")
+      (insert "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\n")
+      (insert "<style>\n")
+      ;; Base styles for accessibility
+      (insert "body { 
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+        margin: 0;
+        padding: 20px;
+        font-size: 17.28px;  /* Decreased from 19.2px by 10% */
+        line-height: 1.6;
+        color: #000;
+        background-color: #fff;
+        -webkit-text-size-adjust: 100%;
+        -webkit-font-smoothing: antialiased;
+      }\n")
+      ;; Section headers
+      (insert "h1 {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 20px 0 10px;
+        padding: 8px;
+        background-color: #f0f0f0;
+        border-radius: 8px;
+        color: #000;
+      }\n")
+      (insert "h2 { 
+        font-size: 18px;
+        font-weight: 700;
+        margin: 20px 0 10px;
+        padding: 8px;
+        background-color: #f0f0f0;
+        border-radius: 8px;
+        color: #000;
+      }\n")
+      ;; Task containers
+      (insert ".task-container {
+        margin: 4px 0;
+        padding: 6px 10px;
+        border-radius: 4px;
+        background-color: #fff;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        max-width: 95%;
+        display: inline-block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.2s ease;
+      }\n")
+      ;; Due Today tasks
+      (insert ".due-today {
+        background-color: #ffebee;
+        border-left: 3px solid #d32f2f;
+      }\n")
+      ;; Today tasks
+      (insert ".today {
+        background-color: #e8f5e9;
+        border-left: 3px solid #2e7d32;
+      }\n")
+      ;; Calendar tasks
+      (insert ".calendar {
+        background-color: #e3f2fd;
+        border-left: 3px solid #1976d2;
+      }\n")
+      ;; Task text
+      (insert ".task-text {
+        font-size: 17.28px;
+        margin: 0;
+        padding: 2px 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.2;
+      }\n")
+      ;; Task date
+      (insert ".task-date {
+        font-size: 14.4px;
+        color: #666;
+        margin-bottom: 1px;
+        white-space: nowrap;
+      }\n")
+      ;; Links
+      (insert "a {
+        color: #0066cc;
+        text-decoration: underline;
+        font-size: 17.28px;  /* Decreased from 19.2px by 10% */
+      }\n")
+      ;; Focus styles for accessibility
+      (insert "*:focus {
+        outline: 3px solid #0066cc;
+        outline-offset: 2px;
+      }\n")
+      ;; Completed task styles
+      (insert ".completed {
+        text-decoration: line-through;
+        opacity: 0.6;
+      }\n")
+      ;; High contrast mode support
+      (insert "@media (prefers-contrast: more) {
+        body { color: #000; background: #fff; }
+        .due-today { background: #fff; border-left-color: #000; }
+        .today { background: #fff; border-left-color: #000; }
+        .calendar { background: #fff; border-left-color: #000; }
+        a { color: #000; }
+      }\n")
+      ;; Dark mode support
+      (insert "@media (prefers-color-scheme: dark) {
+        body { color: #fff; background: #000; }
+        h2 { background-color: #1a1a1a; color: #fff; }
+        .task-container { background-color: #1a1a1a; }
+        .due-today { background-color: #330000; }
+        .today { background-color: #003300; }
+        .calendar { background-color: #000033; }
+        .task-date { color: #ccc; }
+        a { color: #66b3ff; }
+      }\n")
+      (insert "</style>\n")
+      (insert "<script>\n")
+      (insert "document.addEventListener('DOMContentLoaded', function() {
+        // Get all task containers
+        const taskContainers = document.querySelectorAll('.task-container');
+        
+        // Add touch event listeners to each task container
+        taskContainers.forEach(container => {
+          let touchStartTime;
+          let touchEndTime;
+          
+          container.addEventListener('touchstart', function(e) {
+            touchStartTime = new Date().getTime();
+          }, false);
+          
+          container.addEventListener('touchend', function(e) {
+            touchEndTime = new Date().getTime();
+            const touchDuration = touchEndTime - touchStartTime;
+            
+            // Only toggle if it's a quick tap (less than 300ms)
+            if (touchDuration < 300) {
+              const taskText = container.querySelector('.task-text');
+              taskText.classList.toggle('completed');
+              
+              // Save the state to localStorage
+              const taskId = container.getAttribute('data-task-id');
+              const isCompleted = taskText.classList.contains('completed');
+              localStorage.setItem('task-' + taskId, isCompleted);
+            }
+          }, false);
+        });
+        
+        // Restore completed states from localStorage
+        taskContainers.forEach(container => {
+          const taskId = container.getAttribute('data-task-id');
+          const isCompleted = localStorage.getItem('task-' + taskId) === 'true';
+          if (isCompleted) {
+            const taskText = container.querySelector('.task-text');
+            taskText.classList.add('completed');
+          }
+        });
+      });\n")
+      (insert "</script>\n")
+      (insert "</head>\n<body>\n")
+      
+      ;; Due Today section
+      (insert "<h2>Due Today</h2>\n")
+      (dolist (task due-today-tasks)
+        (insert "<div class=\"task-container due-today\" data-task-id=\"")
+        (insert (md5 task))  ;; Use MD5 hash of task as unique ID
+        (insert "\">\n")
+        (insert "<p class=\"task-text\">")
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (task-manager-make-urls-clickable task-text)))
+        (insert "</p>\n</div>\n"))
+      
+      ;; Today tasks section
+      (insert "<h2>Today</h2>\n")
+      (dolist (task today-tasks)
+        (insert "<div class=\"task-container today\" data-task-id=\"")
+        (insert (md5 task))  ;; Use MD5 hash of task as unique ID
+        (insert "\">\n")
+        (insert "<p class=\"task-text\">")
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (task-manager-make-urls-clickable task-text)))
+        (insert "</p>\n</div>\n"))
+      
+      ;; Calendar tasks section
+      (insert "<h2>Calendar</h2>\n")
+      (dolist (task calendar-tasks)
+        (let* ((date (task-manager-parse-date-from-task task))
+               (task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task))
+               (task-text (replace-regexp-in-string "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" "" task-text))
+               (task-text (replace-regexp-in-string "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" "" task-text))
+               (task-text (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" "" task-text))
+               (task-text (string-trim task-text))
+               (formatted-date (when date
+                                (let ((time (encode-time 0 0 0 
+                                                         (string-to-number (substring date 8 10))
+                                                         (string-to-number (substring date 5 7))
+                                                         (string-to-number (substring date 0 4)))))
+                                  (format-time-string "%A, %d/%m %Y" time)))))
+          (insert "<div class=\"task-container calendar\" data-task-id=\"")
+          (insert (md5 task))  ;; Use MD5 hash of task as unique ID
+          (insert "\">\n")
+          (when formatted-date
+            (insert (format "<p class=\"task-date\">%s</p>\n" formatted-date)))
+          (insert "<p class=\"task-text\">")
+          (insert (task-manager-make-urls-clickable task-text))
+          (insert "</p>\n</div>\n")))
+      
+      (insert "</body>\n</html>")
+      
+      ;; Save HTML to file silently
+      (write-region (point-min) (point-max) report-file nil t))
+    
+    ;; Generate Markdown
+    (with-temp-buffer
+      (insert "# Task Report\n\n")
+      
+      ;; Due Today section
+      (insert "## Due Today\n\n")
+      (dolist (task due-today-tasks)
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (format "- %s\n" task-text))))
+      (insert "\n")
+      
+      ;; Today section
+      (insert "## Today\n\n")
+      (dolist (task today-tasks)
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (format "- %s\n" task-text))))
+      (insert "\n")
+      
+      ;; Calendar section
+      (insert "## Calendar\n\n")
+      (dolist (task calendar-tasks)
+        (let* ((date (task-manager-parse-date-from-task task))
+               (task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task))
+               (task-text (replace-regexp-in-string "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" "" task-text))
+               (task-text (replace-regexp-in-string "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" "" task-text))
+               (task-text (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" "" task-text))
+               (task-text (string-trim task-text))
+               (formatted-date (when date
+                                (let ((time (encode-time 0 0 0 
+                                                       (string-to-number (substring date 8 10))
+                                                       (string-to-number (substring date 5 7))
+                                                       (string-to-number (substring date 0 4)))))
+                                  (format-time-string "%A, %d/%m %Y" time)))))
+          (insert (format "### %s\n\n" (or formatted-date "")))
+          (insert (format "- %s\n\n" task-text))))
+      
+      ;; Save Markdown to file silently
+      (write-region (point-min) (point-max) markdown-file nil t))
+    
+    (message "HTML and Markdown reports generated at %s" report-file)))
 
-;; teclado español para #
-;; Fix Spanish keyboard hash key
-(global-set-key (kbd "M-3") "#")  ; Alt + 3
-;; Alternative if needed
-(global-set-key (kbd "M-S-3") "#")  ; Alt + Shift + 3
+;; Add key binding for HTML report generation
+(define-key task-manager-mode-map (kbd "H") 'task-manager-generate-html-report)
 
-;; Save more buffer-local variables
-(add-to-list 'desktop-locals-to-save 'buffer-display-time)
-(add-to-list 'desktop-locals-to-save 'tab-line-format)
+;; Add variable for the auto-report timer
+(defvar task-manager-auto-report-timer nil
+  "Timer object for automatic HTML report generation.")
 
-;; Save tab-line state
-(defun my-desktop-save-hook ()
-  "Save tab-line state when saving desktop."
-  (setq desktop-saved-tab-state
-        (mapcar (lambda (buffer)
-                 (with-current-buffer buffer
-                   (when (buffer-file-name)
-                     (cons (buffer-file-name) tab-line-format))))
-               (buffer-list))))
+(defun task-manager-schedule-auto-report ()
+  "Schedule automatic generation of HTML report at 10:00 AM local time."
+  (interactive)
+  ;; Cancel any existing timer
+  (when task-manager-auto-report-timer
+    (cancel-timer task-manager-auto-report-timer))
+  
+  ;; Calculate time until next 10 AM
+  (let* ((now (current-time))
+         (now-decoded (decode-time now))
+         (hour (nth 2 now-decoded))
+         (minute (nth 1 now-decoded))
+         (second (nth 0 now-decoded))
+         (target-hour 10)
+         (target-minute 0)
+         (target-second 0)
+         (seconds-until-target
+          (if (< hour target-hour)
+              ;; If current time is before 10 AM, calculate seconds until 10 AM today
+              (+ (* (- target-hour hour) 3600)
+                 (* (- target-minute minute) 60)
+                 (- target-second second))
+            ;; If current time is after 10 AM, calculate seconds until 10 AM tomorrow
+            (+ (* (- (+ 24 target-hour) hour) 3600)
+               (* (- target-minute minute) 60)
+               (- target-second second)))))
+    
+    ;; Schedule the report generation
+    (setq task-manager-auto-report-timer
+          (run-at-time seconds-until-target nil 'task-manager-generate-auto-report))
+    
+    ;; Calculate and show the next report time
+    (let ((next-report-time (time-add now (seconds-to-time seconds-until-target))))
+      (message "Next automatic report generation scheduled for %s" 
+               (format-time-string "%Y-%m-%d %H:%M:%S" next-report-time)))))
 
-(defun my-desktop-restore-hook ()
-  "Restore tab-line state when loading desktop."
-  (when (boundp 'desktop-saved-tab-state)
-    (dolist (state desktop-saved-tab-state)
-      (when (car state)
-        (with-current-buffer (find-file-noselect (car state))
-          (setq tab-line-format (cdr state)))))))
+(defun task-manager-generate-auto-report ()
+  "Generate and save HTML report automatically at scheduled time."
+  (let* ((today (format-time-string "%Y-%m-%d"))
+         (due-today-tasks nil)
+         (today-tasks nil)
+         (calendar-tasks nil)
+         (report-file "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/task-report.html")
+         (markdown-file "/Users/juanmanuelferreradiaz/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/my-gtd/task-report.md"))
+    
+    ;; Collect tasks
+    (dolist (section task-manager-sections)
+      (let ((tasks (gethash section task-manager-tasks)))
+        (dolist (task tasks)
+          (cond
+           ;; Due Today tasks
+           ((or (and (string-match "\\[Due: \\([^]]+\\)\\]" task)
+                     (string= (match-string 1 task) today))
+                (string-match-p "\\[Recurring: daily\\]" task))
+            (push task due-today-tasks))
+           ;; Today section tasks
+           ((string= section "Today")
+            (push task today-tasks))
+           ;; Calendar section tasks
+           ((string= section "Calendar")
+            (push task calendar-tasks))))))
+    
+    ;; Reverse the lists to maintain original order
+    (setq due-today-tasks (reverse due-today-tasks))
+    (setq today-tasks (reverse today-tasks))
+    (setq calendar-tasks (reverse calendar-tasks))
+    
+    ;; Take only first 15 Calendar tasks
+    (setq calendar-tasks (seq-take calendar-tasks 15))
+    
+    ;; Generate HTML
+    (with-temp-buffer
+      (insert "<!DOCTYPE html>\n")
+      (insert "<html>\n<head>\n")
+      (insert "<meta charset=\"UTF-8\">\n")
+      (insert "<style>\n")
+      (insert "body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; margin: 40px; font-size: 32px; line-height: 1.5; color: #333; }\n")
+      (insert "table { border-collapse: collapse; margin-bottom: 30px; width: 100%; }\n")
+      (insert "th { background-color: #f8f8f8; padding: 12px; text-align: left; font-size: 28px; font-weight: 600; color: #666; border-bottom: 1px solid #e0e0e0; }\n")
+      (insert "td { padding: 12px; border-bottom: 1px solid #e0e0e0; font-size: 32px; }\n")
+      (insert "h1 { color: #333; margin-top: 40px; font-size: 41px; font-weight: 600; }\n")
+      (insert "h2 { color: #333; margin-top: 30px; font-size: 34px; font-weight: 600; }\n")
+      (insert ".due-today { background-color: #ff6b6b; color: white; }\n")
+      (insert ".today { background-color: #4ecdc4; color: white; }\n")
+      (insert ".calendar { background-color: #fff9e6; }\n")
+      (insert "tr:nth-child(even) { background-color: #fafafa; }\n")
+      (insert "tr:hover { background-color: #f5f5f5; }\n")
+      (insert "a { color: #0066cc; text-decoration: none; font-size: 32px; }\n")
+      (insert "a:hover { text-decoration: underline; }\n")
+      (insert ".task-date { color: #666; font-size: 28px; }\n")
+      (insert ".task-text { font-size: 32px; }\n")
+      (insert ".today td { padding: 8px 12px; line-height: 1.2; }\n")  ;; Reduced line height and padding
+      (insert ".today tr { margin: 0; border-spacing: 0; }\n")  ;; Remove spacing between rows
+      (insert ".today table { border-spacing: 0; border-collapse: collapse; }\n")  ;; Ensure no spacing in table
+      (insert "</style>\n")
+      (insert "</head>\n<body>\n")
+      
+      ;; Due Today table
+      (insert "<h2>Due Today</h2>\n")
+      (insert "<table>\n")
+      (dolist (task due-today-tasks)
+        (insert "<tr class=\"due-today\"><td class=\"task-text\">")
+        (insert (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task))
+        (insert "</td></tr>\n"))
+      (insert "</table>\n")
+      
+      ;; Today tasks table
+      (insert "<h2>Today</h2>\n")
+      (insert "<table class=\"today\">\n")  ;; Add class to table
+      (dolist (task today-tasks)
+        (insert "<tr class=\"today\"><td class=\"task-text\">")
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (task-manager-make-urls-clickable task-text)))
+        (insert "</td></tr>\n"))
+      (insert "</table>\n")
+      
+      ;; Calendar tasks table
+      (insert "<h2>Calendar</h2>\n")
+      (insert "<table>\n")
+      (dolist (task calendar-tasks)
+        (let* ((date (task-manager-parse-date-from-task task))
+               (task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task))
+               (task-text (replace-regexp-in-string "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" "" task-text))
+               (task-text (replace-regexp-in-string "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" "" task-text))
+               (task-text (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" "" task-text))
+               (task-text (string-trim task-text))
+               (formatted-date (when date
+                                (let ((time (encode-time 0 0 0 
+                                                         (string-to-number (substring date 8 10))
+                                                         (string-to-number (substring date 5 7))
+                                                         (string-to-number (substring date 0 4)))))
+                                  (format-time-string "%A, %d/%m %Y" time)))))
+          (insert "<tr class=\"calendar\"><td class=\"task-date\">")
+          (insert (or formatted-date ""))
+          (insert "</td><td class=\"task-text\">")
+          (insert (task-manager-make-urls-clickable task-text))
+          (insert "</td></tr>\n")))
+      (insert "</table>\n")
+      
+      (insert "</body>\n</html>")
+      
+      ;; Save HTML to file silently
+      (write-region (point-min) (point-max) report-file nil t))
+    
+    ;; Generate Markdown
+    (with-temp-buffer
+      (insert "# Task Report\n\n")
+      
+      ;; Due Today section
+      (insert "## Due Today\n\n")
+      (dolist (task due-today-tasks)
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (format "- %s\n" task-text))))
+      (insert "\n")
+      
+      ;; Today section
+      (insert "## Today\n\n")
+      (dolist (task today-tasks)
+        (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
+          (insert (format "- %s\n" task-text))))
+      (insert "\n")
+      
+      ;; Calendar section
+      (insert "## Calendar\n\n")
+      (dolist (task calendar-tasks)
+        (let* ((date (task-manager-parse-date-from-task task))
+               (task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task))
+               (task-text (replace-regexp-in-string "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" "" task-text))
+               (task-text (replace-regexp-in-string "<[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [A-Za-z]\\{3\\}>" "" task-text))
+               (task-text (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" "" task-text))
+               (task-text (string-trim task-text))
+               (formatted-date (when date
+                                (let ((time (encode-time 0 0 0 
+                                                       (string-to-number (substring date 8 10))
+                                                       (string-to-number (substring date 5 7))
+                                                       (string-to-number (substring date 0 4)))))
+                                  (format-time-string "%A, %d/%m %Y" time)))))
+          (insert (format "### %s\n\n" (or formatted-date "")))
+          (insert (format "- %s\n\n" task-text))))
+      
+      ;; Save Markdown to file silently
+      (write-region (point-min) (point-max) markdown-file nil t))
+    
+    ;; Schedule next report
+    (task-manager-schedule-auto-report)))
 
-;; Add our hooks
-(add-hook 'desktop-save-hook #'my-desktop-save-hook)
-(add-hook 'desktop-after-read-hook #'my-desktop-restore-hook)
+;; Schedule the first automatic report when the file is loaded
+(add-hook 'after-init-hook 'task-manager-schedule-auto-report)
 
-;; Auto-save desktop periodically
-(run-with-idle-timer 300 t #'desktop-save-in-desktop-dir)
+;; Add this function after task-manager-parse-date-from-task
 
+(defun task-manager-sort-tasks-by-due-date (tasks)
+  "Sort TASKS by their due dates. Tasks without due dates are placed at the end."
+  (sort tasks
+        (lambda (a b)
+          (let ((date-a (task-manager-parse-date-from-task a))
+                (date-b (task-manager-parse-date-from-task b)))
+            (cond
+             ;; If both tasks have dates, compare them
+             ((and date-a date-b)
+              (string< date-a date-b))
+             ;; If only first task has date, it comes first
+             (date-a t)
+             ;; If only second task has date, it comes first
+             (date-b nil)
+             ;; If neither has date, maintain original order
+             (t nil))))))
 
-(provide 'init)
-;;; init.el ends here
-(put 'downcase-region 'disabled nil)
+(provide 'task-manager2)
+
+;;; task-manager2.el ends here
+
