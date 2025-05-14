@@ -218,22 +218,34 @@
 (defun task-manager2-init ()
   "Initialize the task manager."
   (interactive)
+  (setq task-manager-tasks (make-hash-table :test 'equal))
+  (setq task-manager-expanded-sections (make-hash-table :test 'equal))
+  (setq task-manager-selected-tasks nil)
+  (setq task-manager-task-notes (make-hash-table :test 'equal))
+  (setq task-manager-undo-history nil)
+  (setq task-manager-show-commands nil)
+  (setq task-manager-last-backup-time 0)
+  ;; Initialize calendar
+  (require 'calendar)
+  (require 'org)
+  (setq org-calendar-buffer "*Calendar*")
+  ;; Start with all sections collapsed
+  (dolist (section task-manager-sections)
+    (puthash section nil task-manager-expanded-sections))
   (switch-to-buffer (get-buffer-create "*Task Manager*"))
   (task-manager-mode)
   (task-manager-load-tasks)
   (task-manager-check-overdue-migration)
-  
-  ;; Initialize all sections as expanded
-  (dolist (section task-manager-sections)
-    (puthash section t task-manager-expanded-sections))
-  
   (task-manager-refresh)
-  (task-manager-schedule-auto-migrate))
+  (message "Task manager initialized."))
 
 (define-derived-mode task-manager-mode special-mode "Task Manager"
   "Major mode for task management."
   (buffer-disable-undo)
   (setq buffer-read-only t)
+  ;; Set up key bindings
+  (define-key task-manager-mode-map (kbd "C-g") 'keyboard-quit)
+  (define-key task-manager-mode-map (kbd "a") 'task-manager-add-task)
   
   ;; Create prefix keymaps for 'a', 'A', and 'o'
   (let ((a-map (make-sparse-keymap))
@@ -305,6 +317,22 @@
   (define-key task-manager-mode-map (kbd "X") 'task-manager-setting-reminders)
   (define-key task-manager-mode-map (kbd "z") 'task-manager-collapse-all-sections)
   (define-key task-manager-mode-map (kbd "SPC") 'task-manager-toggle-task-at-point))
+
+;; Add mode hook to make 'd' key override all other functions
+(add-hook 'task-manager-mode-hook
+          (lambda ()
+            ;; Override any existing keybindings for 'd'
+            (local-set-key (kbd "d") 'task-manager-set-due-date)
+            (local-set-key (kbd "C-d") 'task-manager-set-due-date)
+            (local-set-key (kbd "M-d") 'task-manager-set-due-date)
+            ;; Make sure the key binding takes precedence over other modes
+            (define-key task-manager-mode-map (kbd "d") 'task-manager-set-due-date)
+            ;; Disable any other keybindings that might interfere
+            (define-key task-manager-mode-map (kbd "C-d") nil)
+            (define-key task-manager-mode-map (kbd "M-d") nil)))
+
+;; Remove any duplicate keybindings
+(define-key task-manager-mode-map (kbd "d") 'task-manager-set-due-date)
 
 ;; Add the undo keybinding explicitly after mode definition
 (define-key task-manager-mode-map (kbd "u") 'task-manager-undo)
@@ -399,7 +427,7 @@
       
       (setq task-manager-selected-tasks nil)
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       
       ;; Restore cursor position
       (goto-char (point-min))
@@ -412,7 +440,7 @@
   "Toggle the visibility of the commands section."
   (interactive)
   (setq task-manager-show-commands (not task-manager-show-commands))
-  (task-manager-refresh)
+  (task-manager-refresh-keep-cursor)
   (message "Commands %s" (if task-manager-show-commands "shown" "hidden")))
 
 (defun task-manager-browse-url-button (button)
@@ -487,7 +515,7 @@
                      current-date current-time life-percentage weeks-remaining days-remaining)))
     
     ;; Display tasks due today at the top
-    (insert (propertize "Due Today" 'face '(:inherit font-lock-keyword-face :weight bold :foreground "#FF6B6B")))
+    (insert (propertize "⏰ Due Today" 'face '(:inherit font-lock-keyword-face :weight bold)))
     (insert " [-]\n")
     (let ((due-today-tasks nil))
       ;; Find tasks due today or with daily recurring
@@ -547,7 +575,17 @@
         (let ((tasks (gethash section task-manager-tasks))
               (expanded (gethash section task-manager-expanded-sections)))
           ;; Add section header with color based on section
-          (insert (propertize (format "%s (%d)" section (length tasks))
+          (insert (propertize (format "%s %s (%d)" 
+                                    (cond
+                                     ((string= section "Inbox") "📥")
+                                     ((string= section "Today") "🌞")
+                                     ((string= section "Week") "📊")
+                                     ((string= section "Monday") "📌")
+                                     ((string= section "Calendar") "📆")
+                                     ((string= section "Someday") "⏳")
+                                     ((string= section "Archive") "📦")
+                                     (t ""))
+                                    section (length tasks))
                              'face (cond
                                    ((string= section "Inbox") '(:foreground "#4ECDC4" :weight bold))
                                    ((string= section "Today") '(:foreground "#FF6B6B" :weight bold))
@@ -682,25 +720,28 @@
             ((eq key ?s) "Someday")
             (t (message "Invalid section key. Use i,t,w,o,c,s")
                (keyboard-quit))))))
-  (let ((task (if (string= section "Calendar")
-                  ;; For Calendar section, first get the date
-                  (let ((date (task-manager-select-date-with-calendar)))
-                    (if date
-                        (let ((task-text (read-string "Enter new task: ")))
-                          (if (string-empty-p task-text)
-                              (progn
-                                (message "Task creation cancelled.")
-                                (keyboard-quit))
-                            (format "%s [Due: %s]" task-text date)))
-                      (message "Date selection cancelled.")
-                      (keyboard-quit)))
-                ;; For other sections, just get the task
-                (let ((task-text (read-string "Enter new task: ")))
-                  (if (string-empty-p task-text)
-                      (progn
-                        (message "Task creation cancelled.")
-                        (keyboard-quit))
-                    task-text)))))
+  (let ((task nil))
+    (condition-case nil
+        (setq task (if (string= section "Calendar")
+                       ;; For Calendar section, first get the date
+                       (let ((date (task-manager-select-date-with-calendar)))
+                         (if date
+                             (let ((task-text (read-string "Enter new task: " "")))
+                               (if (string-empty-p task-text)
+                                   (progn
+                                     (message "Task creation cancelled.")
+                                     (keyboard-quit))
+                                 (format "%s [Due: %s]" task-text date)))
+                           (message "Date selection cancelled.")
+                           (keyboard-quit)))
+                     ;; For other sections, just get the task
+                     (let ((task-text (read-string "Enter new task: " "")))
+                       (if (string-empty-p task-text)
+                           (progn
+                             (message "Task creation cancelled.")
+                             (keyboard-quit))
+                         task-text))))
+      (quit (setq task nil)))
     (when task
       ;; Check if task has a due date in any format
       (if (or (string-match "\\[Due: [0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\]" task)
@@ -715,7 +756,7 @@
           (push task (gethash section task-manager-tasks))
           (message "Task added to %s section." section)))
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       ;; Find and move to the new task
       (goto-char (point-min))
       (search-forward task nil t)
@@ -726,15 +767,19 @@
   (interactive)
   (let* ((section (or section (task-manager-get-current-section)))
          (tasks '())
-         (task (read-string (format "Add task to %s (empty line to finish): " section))))
-    (while (not (string-empty-p task))
-      (push task tasks)
-      (setq task (read-string (format "Add task to %s (empty line to finish): " section))))
-    (when tasks
+         (task nil))
+    (condition-case nil
+        (progn
+          (setq task (read-string (format "Add task to %s (empty line to finish): " section) ""))
+          (while (not (string-empty-p task))
+            (push task tasks)
+            (setq task (read-string (format "Add task to %s (empty line to finish): " section) ""))))
+      (quit (setq tasks nil)))
+    (when (and tasks (> (length tasks) 0))
       (setf (gethash section task-manager-tasks)
             (append (gethash section task-manager-tasks) (reverse tasks)))
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       ;; Find and move to the last added task
       (goto-char (point-min))
       (search-forward (car (reverse tasks)) nil t)
@@ -805,7 +850,7 @@ otherwise permanently delete them. If cursor is on a task, use that task."
       ;; Clear selected tasks
       (setq task-manager-selected-tasks nil)
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       
       ;; Restore cursor position
       (goto-char (point-min))
@@ -827,7 +872,7 @@ otherwise permanently delete them. If cursor is on a task, use that task."
                           (not (member task (gethash section task-manager-tasks))))
                         task-manager-selected-tasks))
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       (message "All tasks from %s permanently deleted." section))))
 
 (defun task-manager-move-tasks ()
@@ -861,7 +906,7 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
       
       (setq task-manager-selected-tasks nil)
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       
       ;; Restore cursor position
       (goto-char (point-min))
@@ -883,7 +928,7 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
     (dolist (section task-manager-sections)
       (puthash section (not all-collapsed) task-manager-expanded-sections))
     
-    (task-manager-refresh)
+    (task-manager-refresh-keep-cursor)
     (message "All sections %s" (if all-collapsed "expanded" "collapsed"))))
 
 (defun task-manager-toggle-task-at-point ()
@@ -930,7 +975,7 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
         ;; Refresh and position cursor
         (when task-found
           (task-manager-save-tasks)
-          (task-manager-refresh)
+          (task-manager-refresh-keep-cursor)
           
           ;; Try to position at the next task (current line + 1)
           (goto-char (point-min))
@@ -975,7 +1020,7 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
       (maphash (lambda (section tasks)
                  (puthash section (copy-sequence tasks) task-manager-tasks))
                previous-state)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       (message "Undid last operation"))))
 
 (defun task-manager-ensure-backup-directory ()
@@ -1203,7 +1248,7 @@ If called with a section key (i, t, w, o, c, s), move directly to that section."
       (switch-to-buffer buffer)
       ;; Make sure the section is expanded
       (puthash section t task-manager-expanded-sections)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       
       ;; Find and position at the task
       (goto-char (point-min))
@@ -1255,7 +1300,7 @@ Selecting 'None' will clear recurring status."
                     task-manager-selected-tasks)))
     
     (task-manager-save-tasks)
-    (task-manager-refresh)
+    (task-manager-refresh-keep-cursor)
     (if (string= frequency "None")
         (message "Recurring status cleared.")
       (message "Task set as recurring %s." frequency))))
@@ -1292,36 +1337,42 @@ Selecting 'None' will clear recurring status."
                     task-manager-selected-tasks)))
     
     (task-manager-save-tasks)
-    (task-manager-refresh)
+    (task-manager-refresh-keep-cursor)
     (message "Priority for task set to %s." priority)))
 
 (defun task-manager-select-date-with-calendar ()
-  "Use org's calendar to select a date."
-  (let* ((org-read-date-prefer-future nil)
-         (org-read-date-analyze-future-p nil)
-         (org-read-date-completion-format 'iso)
-         (org-read-date-force-compatible-dates t)
-         (org-read-date-display-live t)
-         (org-read-date-show-calendar t)
-         (org-read-date-with-time nil)
-         (org-read-date-allow-time nil)
-         (org-read-date-inactive nil)
-         (org-read-date-prompt "Select date: ")
-         ;; Set default date to today
-         (org-read-date-default-time (encode-time 0 0 0 (nth 1 (decode-time)) 
-                                                (nth 2 (decode-time)) 
-                                                (nth 5 (decode-time))))
-         (date (org-read-date)))
-    (if date
-        (let ((parsed-date (parse-time-string date)))
-          (format "%04d-%02d-%02d" 
-                  (nth 5 parsed-date)   ; year
-                  (nth 4 parsed-date)   ; month
-                  (nth 3 parsed-date))) ; day
-      nil)))
+  "Select a date using org's calendar."
+  (let ((date-time nil))
+    (condition-case nil
+        (progn
+          (require 'calendar)
+          (require 'org)
+          (setq org-calendar-buffer "*Calendar*")
+          (setq date-time
+                (progn
+                  (when (active-minibuffer-window)
+                    (delete-minibuffer-contents))
+                  (org-read-date t t nil "Select date: "))))
+      (quit (progn
+             (when (active-minibuffer-window)
+               (delete-minibuffer-contents))
+             nil)))
+    ;; Cleanup form
+    (when (get-buffer org-calendar-buffer)
+      (kill-buffer org-calendar-buffer))
+    (when (active-minibuffer-window)
+      (delete-minibuffer-contents))
+    
+    (when date-time
+      (let* ((decoded (decode-time date-time))
+             (year (nth 5 decoded))
+             (month (nth 4 decoded))
+             (day (nth 3 decoded)))
+        (format "%04d-%02d-%02d" 
+                year month day)))))
 
 (defun task-manager-set-due-date ()
-  "Set the due date for a task using org's calendar.
+  "Set the due date and time for a task using org's calendar.
 If cursor is on a task, use that task."
   (interactive)
   (let* ((task-at-point (task-manager-get-task-at-point))
@@ -1333,12 +1384,12 @@ If cursor is on a task, use that task."
                    (task-manager-find-task-section task)))
          (existing-date (and (string-match "\\[Due: \\([^]]+\\)\\]" task)
                            (match-string 1 task)))
-         (date (task-manager-select-date-with-calendar))
+         (date-time (task-manager-select-date-with-calendar))
          ;; Remove any existing due date tag
          (task-without-date (replace-regexp-in-string "\\[Due: [^]]*\\]" "" task))
          (task-without-date (string-trim task-without-date))
-         (new-task (if date
-                      (format "%s [Due: %s]" task-without-date date)
+         (new-task (if date-time
+                      (format "%s [Due: %s]" task-without-date date-time)
                     task-without-date)))
     
     ;; Replace old task with new one that includes due date info
@@ -1356,9 +1407,9 @@ If cursor is on a task, use that task."
                     task-manager-selected-tasks)))
     
     (task-manager-save-tasks)
-    (task-manager-refresh)
-    (if date
-        (message "Due date set to %s." date)
+    (task-manager-refresh-keep-cursor)
+    (if date-time
+        (message "Due date and time set to %s." date-time)
       (message "Due date setting cancelled."))))
 
 (defun task-manager-clear-due-date ()
@@ -1390,7 +1441,7 @@ If cursor is on a task, use that task."
                     task-manager-selected-tasks)))
     
     (task-manager-save-tasks)
-    (task-manager-refresh)
+    (task-manager-refresh-keep-cursor)
     (message "Due date cleared.")))
 
 (defun task-manager-get-all-tags ()
@@ -1475,7 +1526,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
                     task-manager-selected-tasks)))
     
     (task-manager-save-tasks)
-    (task-manager-refresh)
+    (task-manager-refresh-keep-cursor)
     (message "Tags updated.")))
 
 (defun task-manager-setting-reminders ()
@@ -1514,7 +1565,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
                     task-manager-selected-tasks)))
     
     (task-manager-save-tasks)
-    (task-manager-refresh)
+    (task-manager-refresh-keep-cursor)
     (message "Reminder for task set at %s." reminder-time)))
 
 (defun task-manager-filter-tasks ()
@@ -1592,7 +1643,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
                                 (if (string= t task) new-task t))
                               tasks)))))))
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       (message "Bulk edited %d tasks." (length task-manager-selected-tasks)))))
 
 (defun task-manager-export ()
@@ -1683,7 +1734,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
             (forward-line 1)))))
       
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       (message "Tasks imported from %s" file))))
 
 (defun task-manager-focus-inbox ()
@@ -1697,7 +1748,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
     (unless (string= section "Inbox")
       (puthash section nil task-manager-expanded-sections)))
   
-  (task-manager-refresh)
+  (task-manager-refresh-keep-cursor)
   
   ;; Navigate to the Inbox section and first task
   (goto-char (point-min))
@@ -1716,7 +1767,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
     (unless (string= section "Today")
       (puthash section nil task-manager-expanded-sections)))
   
-  (task-manager-refresh)
+  (task-manager-refresh-keep-cursor)
   
   ;; Navigate to the Today section and first task
   (goto-char (point-min))
@@ -1735,7 +1786,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
     (unless (string= section "Someday")
       (puthash section nil task-manager-expanded-sections)))
   
-  (task-manager-refresh)
+  (task-manager-refresh-keep-cursor)
   
   ;; Navigate to the Someday section and first task
   (goto-char (point-min))
@@ -1754,7 +1805,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
     (unless (string= section "Week")
       (puthash section nil task-manager-expanded-sections)))
   
-  (task-manager-refresh)
+  (task-manager-refresh-keep-cursor)
   
   ;; Navigate to the Week section and first task
   (goto-char (point-min))
@@ -1773,7 +1824,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
     (unless (string= section "Monday")
       (puthash section nil task-manager-expanded-sections)))
   
-  (task-manager-refresh)
+  (task-manager-refresh-keep-cursor)
   
   ;; Navigate to the Monday section and first task
   (goto-char (point-min))
@@ -1792,7 +1843,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
     (unless (string= section "Calendar")
       (puthash section nil task-manager-expanded-sections)))
   
-  (task-manager-refresh)
+  (task-manager-refresh-keep-cursor)
   
   ;; Navigate to the Calendar section and first task
   (goto-char (point-min))
@@ -1811,7 +1862,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
     (unless (string= section "Archive")
       (puthash section nil task-manager-expanded-sections)))
   
-  (task-manager-refresh)
+  (task-manager-refresh-keep-cursor)
   
   ;; Navigate to the Archive section and first task
   (goto-char (point-min))
@@ -1942,7 +1993,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
                                   task-manager-selected-tasks)))
                   
                   (task-manager-save-tasks)
-                  (task-manager-refresh)
+                  (task-manager-refresh-keep-cursor)
                   
                   ;; Try to position at the same task line
                   (goto-char (point-min))
@@ -1992,7 +2043,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
       
       (setq task-manager-selected-tasks nil)
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       
       ;; Restore cursor position
       (goto-char (point-min))
@@ -2069,7 +2120,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
       
       (setq task-manager-selected-tasks nil)
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       
       ;; Restore cursor position
       (goto-char (point-min))
@@ -2098,7 +2149,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
       
       (setq task-manager-selected-tasks nil)
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       
       ;; Restore cursor position
       (goto-char (point-min))
@@ -2127,7 +2178,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
       
       (setq task-manager-selected-tasks nil)
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       
       ;; Restore cursor position
       (goto-char (point-min))
@@ -2156,7 +2207,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
       
       (setq task-manager-selected-tasks nil)
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       
       ;; Restore cursor position
       (goto-char (point-min))
@@ -2196,7 +2247,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
                       task-manager-selected-tasks))
     
     (task-manager-save-tasks)
-    (task-manager-refresh)
+    (task-manager-refresh-keep-cursor)
     
     ;; Focus on Week section
     (puthash "Week" t task-manager-expanded-sections)
@@ -2227,7 +2278,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
             
             ;; Save and refresh
             (task-manager-save-tasks)
-            (task-manager-refresh)
+            (task-manager-refresh-keep-cursor)
             
             ;; Find the newly added task (it should be the first task in the section)
             (goto-char (point-min))
@@ -2269,7 +2320,7 @@ Shows a list of existing tags for selection and offers an option to delete all t
     (let ((buffer (get-buffer "*Task Manager*")))
       (when (and buffer (get-buffer-window buffer))
         (with-current-buffer buffer
-          (task-manager-refresh))))
+          (task-manager-refresh-keep-cursor))))
     
     (message "Auto-migrated %d tasks from Today to Week section." count)))
 
@@ -2345,7 +2396,7 @@ Excludes tasks.org and backup files (tasks-backup-*). After importing, removes t
                   (delete-region (car pos) (cdr pos)))
                 (save-buffer)))))))
     (task-manager-save-tasks)
-    (task-manager-refresh)
+    (task-manager-refresh-keep-cursor)
     (message "Imported %d tasks from org-agenda to Inbox and removed them from source files." imported-count)))
 
 (defun task-manager-check-overdue-migration ()
@@ -2385,7 +2436,7 @@ Excludes tasks.org and backup files (tasks-backup-*). After importing, removes t
   (interactive)
   (dolist (section task-manager-sections)
     (puthash section nil task-manager-expanded-sections))
-  (task-manager-refresh)
+  (task-manager-refresh-keep-cursor)
   (message "All sections collapsed"))
 
 (defun task-manager-list-tasks-with-dates ()
@@ -2514,7 +2565,7 @@ Returns nil if no due date is found."
                         task-manager-selected-tasks))
       
       (task-manager-save-tasks)
-      (task-manager-refresh)
+      (task-manager-refresh-keep-cursor)
       
       ;; Focus on target section
       (puthash target-section t task-manager-expanded-sections)
@@ -2583,7 +2634,7 @@ Returns nil if no due date is found."
     (let ((task-text (replace-regexp-in-string "\\[\\(Due\\|Priority\\|Recurring\\|Tags\\|Reminder\\): [^]]*\\]" "" task)))
       (kill-buffer)
       (with-current-buffer "*Task Manager*"
-        (task-manager-refresh)
+        (task-manager-refresh-keep-cursor)
         ;; Find and move to the task
         (goto-char (point-min))
         (search-forward task-text nil t)
@@ -3212,6 +3263,21 @@ Returns nil if no due date is found."
              (date-b nil)
              ;; If neither has date, maintain original order
              (t nil))))))
+
+;; Utility: Refresh while keeping cursor fixed in window
+(defun task-manager-refresh-keep-cursor ()
+  "Refresh the display of tasks, keeping the cursor at the same visual position in the window."
+  (let* ((win (selected-window))
+         (orig-point (point))
+         (orig-window-start (window-start win))
+         (lines-from-top (count-screen-lines orig-window-start orig-point)))
+    (task-manager-refresh)
+    (goto-char orig-point)
+    (let ((new-window-start (save-excursion
+                              (goto-char (point-min))
+                              (forward-line (max 0 (- (line-number-at-pos (point)) lines-from-top)))
+                              (point))))
+      (set-window-start win new-window-start))))
 
 (provide 'task-manager2)
 
